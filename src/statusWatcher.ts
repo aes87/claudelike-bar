@@ -46,7 +46,9 @@ export class StatusWatcher implements vscode.Disposable {
       const data: StatusFileData = JSON.parse(content);
 
       // Validate expected shape
-      if (!data.project || !data.status || !data.timestamp) return;
+      if (!data.project || !data.timestamp) return;
+      // Statusline writes may only have context_percent, no status
+      if (!data.status && data.context_percent === undefined) return;
 
       // Clear any existing done->idle timer for this project
       const existingTimer = this.doneTimers.get(data.project);

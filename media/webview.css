@@ -30,7 +30,7 @@ body {
 .tile {
   background: var(--vscode-editor-background);
   border: 1px solid var(--vscode-panel-border);
-  border-left: 3px solid var(--tile-color, var(--vscode-panel-border));
+  border-left: 5px solid var(--tile-color, var(--vscode-panel-border));
   border-radius: 4px;
   padding: 10px 12px;
   cursor: pointer;
@@ -62,7 +62,7 @@ body {
   transform: translateY(0);
 }
 
-/* Tile top row: dot + name + time */
+/* Tile top row: dot + name + time + ctx */
 .tile-header {
   display: flex;
   align-items: center;
@@ -84,12 +84,32 @@ body {
   white-space: nowrap;
 }
 
+/* Context % badge */
+.tile-ctx {
+  font-size: 10px;
+  color: var(--vscode-terminal-ansiBrightBlue);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-ctx.ctx-warn {
+  color: var(--vscode-terminal-ansiYellow);
+}
+
+.tile-ctx.ctx-crit {
+  color: var(--vscode-terminal-ansiRed);
+}
+
 /* Tile bottom row: status text */
 .tile-status {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
   margin-top: 3px;
   padding-left: 18px; /* align with text after dot */
+}
+
+.tile-status.status-ignored {
+  font-style: italic;
 }
 
 /* Status dot */
@@ -118,6 +138,11 @@ body {
 .dot.done {
   background: var(--vscode-terminal-ansiCyan);
   animation: fade-out 30s ease-out forwards;
+}
+
+.dot.ignored {
+  background: var(--vscode-terminal-ansiYellow);
+  opacity: 0.5;
 }
 
 /* Animations */

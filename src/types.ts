@@ -1,4 +1,4 @@
-export type SessionStatus = 'idle' | 'working' | 'waiting' | 'done';
+export type SessionStatus = 'idle' | 'working' | 'waiting' | 'done' | 'ignored';
 
 export interface TileData {
   name: string;
@@ -6,7 +6,9 @@ export interface TileData {
   lastActivity: number; // unix timestamp
   event?: string;
   isActive: boolean;
-  themeColor: string;
+  themeColor: string; // CSS variable name for the ANSI color
+  contextPercent?: number;
+  ignoredText?: string;
 }
 
 export interface StatusFileData {
@@ -14,6 +16,7 @@ export interface StatusFileData {
   status: SessionStatus;
   timestamp: number;
   event: string;
+  context_percent?: number;
 }
 
 export type ThemeGroup = 'cyan' | 'green' | 'blue' | 'magenta' | 'yellow' | 'white';
@@ -51,16 +54,17 @@ export const THEME_MAP: Record<string, ThemeGroup> = {
   'workspace': 'white',
 };
 
-export const THEME_COLORS: Record<ThemeGroup, string> = {
-  cyan: '#4ec9b0',
-  green: '#6a9955',
-  blue: '#569cd6',
-  magenta: '#c586c0',
-  yellow: '#dcdcaa',
-  white: '#d4d4d4',
+// Use VS Code's terminal ANSI CSS variables so colors match terminal tab indicators exactly
+export const THEME_CSS_VARS: Record<ThemeGroup, string> = {
+  cyan: 'var(--vscode-terminal-ansiCyan)',
+  green: 'var(--vscode-terminal-ansiGreen)',
+  blue: 'var(--vscode-terminal-ansiBrightBlue)',
+  magenta: 'var(--vscode-terminal-ansiMagenta)',
+  yellow: 'var(--vscode-terminal-ansiYellow)',
+  white: 'var(--vscode-terminal-ansiBrightWhite)',
 };
 
 export function getThemeColor(projectName: string): string {
   const group = THEME_MAP[projectName];
-  return THEME_COLORS[group ?? 'white'];
+  return THEME_CSS_VARS[group ?? 'white'];
 }

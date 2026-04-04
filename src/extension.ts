@@ -30,7 +30,11 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Refresh tiles on status file changes
   watcher.onStatusChange((data) => {
-    tracker.updateStatus(data.project, data.status, data.event);
+    if (data.status) {
+      tracker.updateStatus(data.project, data.status, data.event, data.context_percent);
+    } else if (data.context_percent !== undefined) {
+      tracker.updateContext(data.project, data.context_percent);
+    }
   });
 
   // Periodic refresh for relative time display (every 30s)
