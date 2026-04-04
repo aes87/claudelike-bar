@@ -6,7 +6,15 @@ Probably open six terminals, lose track of which one needs input, miss the notif
 
 This fixes that.
 
-**[Live Preview →](https://aes87.github.io/claudelike-bar/)**
+<div align="center">
+
+### [🔴 LIVE PREVIEW — See it in action →](https://aes87.github.io/claudelike-bar/)
+
+*Interactive demo with animated status dots, theme colors, and all five states*
+
+</div>
+
+---
 
 ## What It Is
 
