@@ -1,8 +1,8 @@
 {
-  "name": "claude-terminal-dashboard",
-  "displayName": "Claude Terminal Dashboard",
+  "name": "claudelike-bar",
+  "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "publisher": "aes87",
   "engines": { "vscode": "^1.93.0" },
   "categories": ["Other"],
@@ -12,7 +12,7 @@
     "viewsContainers": {
       "activitybar": [{
         "id": "claude-dashboard",
-        "title": "Claude Dashboard",
+        "title": "Claudelike Bar",
         "icon": "media/dashboard.svg"
       }]
     },

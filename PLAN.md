@@ -340,3 +340,36 @@ Could be made dynamic later by reading devcontainer.json or a config file.
 4. **Extension packaging**: This is a workspace extension (reads `/tmp` inside container). Must be installed in the container, not on the host. Sideloading via `.vsix` in the Dockerfile or `postCreateCommand` is the path.
 
 5. **Webview state on sidebar collapse**: Use `retainContextWhenHidden: true` to keep tile state alive when user switches sidebar panels.
+
+---
+
+## Phase 5: TODO — Bug Fixes & New Features
+
+### Rename
+
+- [x] Rename extension from "Claude Terminal Dashboard" to **"Claudelike Bar"** — update `displayName`, activity bar title, sidebar view name, and all associated branding
+
+### Bug Fixes
+
+- [x] **"Passive aggressive" (ignored) state never triggers**
+  - Fixed: `notify-silent.sh` writes `"done"` and `notify.sh` writes `"waiting"` to dashboard JSON
+- [x] **Can't visually distinguish "done" from "ignored" (passive aggressive)**
+  - Fixed: Ignored now uses red dot (slow pulse) + dashed border + dimmed tile. Done stays cyan static. Clearly distinct.
+
+### Right-Click Context Menu
+
+- [x] **Clone terminal** — duplicate the clicked terminal (same profile/tmux session)
+- [x] **Kill terminal** — close/dispose the terminal
+- [x] **Set color manually** — override the theme-group color for this specific tile (7-color swatch picker + reset to default)
+
+### Settings Panel (Title Bar Gear Icon)
+
+Add a gear icon to the sidebar title bar that opens a settings webview. Features:
+
+- [ ] **Per-terminal color assignment** — change which color is assigned to each terminal individually
+- [ ] **Group-based color assignment** — define named groups (e.g. "Life & Finance", "Home & IoT") and assign a color to the whole group
+- [ ] **Drag-and-drop interface** — drag terminals between groups; drag colors from a palette onto groups/terminals
+- [ ] **Color palette picker** — visual palette to pick from and drop onto targets
+- [ ] **Terminal nicknames** — give each terminal a display name that overrides the profile name on the tile
+- [ ] **Auto-start toggle** — checkbox per terminal: whether it should auto-launch when VS Code starts
+- [ ] **Persist all settings** between sessions (use VS Code `globalState` or a JSON config file that survives container rebuilds — bind-mounted or in workspace)

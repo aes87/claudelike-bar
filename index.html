@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Claude Terminal Dashboard — v0.2 UX Preview</title>
+  <title>Claudelike Bar — v0.3 UX Preview</title>
   <style>
     :root {
       --vscode-font-family: 'Segoe UI', system-ui, sans-serif;
@@ -81,7 +81,9 @@
     .dot.working { background: var(--vscode-terminal-ansiGreen); animation: pulse 1.5s ease-in-out infinite; }
     .dot.waiting { background: var(--vscode-terminal-ansiYellow); animation: blink 1s step-end infinite; }
     .dot.done { background: var(--vscode-terminal-ansiCyan); }
-    .dot.ignored { background: var(--vscode-terminal-ansiYellow); opacity: 0.5; }
+    .dot.ignored { background: var(--vscode-terminal-ansiRed); opacity: 0.7; animation: ignored-pulse 3s ease-in-out infinite; }
+    @keyframes ignored-pulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 0.3; } }
+    .tile.status-ignored { border-left-style: dashed; opacity: 0.75; }
 
     @keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
@@ -96,7 +98,7 @@
     .legend-dot.working { background: var(--vscode-terminal-ansiGreen); animation: pulse 1.5s ease-in-out infinite; }
     .legend-dot.waiting { background: var(--vscode-terminal-ansiYellow); animation: blink 1s step-end infinite; }
     .legend-dot.done { background: var(--vscode-terminal-ansiCyan); }
-    .legend-dot.ignored { background: var(--vscode-terminal-ansiYellow); opacity: 0.5; }
+    .legend-dot.ignored { background: var(--vscode-terminal-ansiRed); opacity: 0.7; animation: ignored-pulse 3s ease-in-out infinite; }
     .legend-dot.idle { background: transparent; border: 1px solid var(--vscode-descriptionForeground); }
     .note { font-size: 12px; color: var(--vscode-descriptionForeground); margin-top: 8px; line-height: 1.5; }
     .new-badge { display: inline-block; font-size: 9px; font-weight: 700; background: var(--vscode-terminal-ansiGreen); color: #1e1e2e; padding: 1px 5px; border-radius: 3px; margin-left: 6px; vertical-align: middle; }
@@ -109,7 +111,7 @@
     <div class="sidebar-header">Terminals</div>
     <div class="sidebar-content">
 
-      <div class="tile" style="--tile-color: var(--vscode-terminal-ansiCyan)">
+      <div class="tile status-ignored" style="--tile-color: var(--vscode-terminal-ansiCyan)">
         <div class="tile-header">
           <span class="dot ignored"></span>
           <span class="tile-name">life-planner</span>
@@ -178,12 +180,12 @@
   </div>
 
   <div class="legend">
-    <h2>claudelike-bar v0.2 — UX Preview</h2>
+    <h2>claudelike-bar v0.3 — UX Preview</h2>
 
     <div class="legend-section">
       <h3>Status indicators</h3>
       <div class="legend-item"><span class="legend-dot waiting"></span> Waiting — amber blink (needs input, hasn't been seen)</div>
-      <div class="legend-item"><span class="legend-dot ignored"></span> Ignored — amber static, dimmed (was waiting, you looked elsewhere) <span class="new-badge">NEW</span></div>
+      <div class="legend-item"><span class="legend-dot ignored"></span> Ignored — red slow pulse, dashed border (was waiting, you looked elsewhere)</div>
       <div class="legend-item"><span class="legend-dot working"></span> Working — green pulse</div>
       <div class="legend-item"><span class="legend-dot done"></span> Done — cyan static (fades after 30s)</div>
       <div class="legend-item"><span class="legend-dot idle"></span> Idle — no dot</div>
@@ -208,13 +210,13 @@
     </div>
 
     <div class="legend-section">
-      <h3>v0.2 changes</h3>
+      <h3>v0.3 changes</h3>
       <div class="note">
-        1. <strong>No more flicker</strong> — DOM diffing, no full redraws<br>
-        2. <strong>Context %</strong> — from statusline bridge to /tmp/claude-dashboard/<br>
-        3. <strong>Sticky waiting</strong> — stays until you actually look at the terminal<br>
-        4. <strong>Ignored state</strong> — italic quips when you focus elsewhere<br>
-        5. <strong>Thicker border</strong> — 3px → 5px, using real ANSI color vars
+        1. <strong>Renamed</strong> — "Claude Terminal Dashboard" → "Claudelike Bar"<br>
+        2. <strong>Terminal tracking fix</strong> — stable IDs, no ghost tiles after close/reopen<br>
+        3. <strong>Live name refresh</strong> — picks up profile names even if set after open<br>
+        4. <strong>Done vs ignored</strong> — distinct border styles for clearer visual separation<br>
+        5. <strong>Right-click menu</strong> — clone, kill, or set color on any tile
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 export type SessionStatus = 'idle' | 'working' | 'waiting' | 'done' | 'ignored';
 
 export interface TileData {
+  id: number; // stable numeric identity — used as DOM key and in webview messages
   name: string;
   status: SessionStatus;
   lastActivity: number; // unix timestamp
@@ -9,7 +10,14 @@ export interface TileData {
   themeColor: string; // CSS variable name for the ANSI color
   contextPercent?: number;
   ignoredText?: string;
+  colorOverride?: string; // manual color name override
 }
+
+export type WebviewMessage =
+  | { type: 'switchTerminal'; id: number }
+  | { type: 'cloneTerminal'; id: number }
+  | { type: 'killTerminal'; id: number }
+  | { type: 'setColor'; id: number; color: string | null };
 
 export interface StatusFileData {
   project: string;
@@ -64,7 +72,15 @@ export const THEME_CSS_VARS: Record<ThemeGroup, string> = {
   white: 'var(--vscode-terminal-ansiBrightWhite)',
 };
 
-export function getThemeColor(projectName: string): string {
+export const COLOR_OVERRIDE_CSS: Record<string, string> = {
+  ...THEME_CSS_VARS,
+  red: 'var(--vscode-terminal-ansiRed)',
+};
+
+export function getThemeColor(projectName: string, override?: string): string {
+  if (override && COLOR_OVERRIDE_CSS[override]) {
+    return COLOR_OVERRIDE_CSS[override];
+  }
   const group = THEME_MAP[projectName];
   return THEME_CSS_VARS[group ?? 'white'];
 }

@@ -141,8 +141,15 @@ body {
 }
 
 .dot.ignored {
-  background: var(--vscode-terminal-ansiYellow);
-  opacity: 0.5;
+  background: var(--vscode-terminal-ansiRed);
+  opacity: 0.7;
+  animation: ignored-pulse 3s ease-in-out infinite;
+}
+
+/* Ignored tile gets dashed border to visually separate from done */
+.tile.status-ignored {
+  border-left-style: dashed;
+  opacity: 0.75;
 }
 
 /* Animations */
@@ -159,4 +166,72 @@ body {
 @keyframes fade-out {
   0%, 80% { opacity: 1; }
   100% { opacity: 0.2; }
+}
+
+@keyframes ignored-pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 0.3; }
+}
+
+/* Context menu */
+.context-menu {
+  position: fixed;
+  background: var(--vscode-menu-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  padding: 4px 0;
+  min-width: 160px;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.context-menu-item {
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.context-menu-item:hover {
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: var(--vscode-menu-separatorBackground, var(--vscode-panel-border));
+  margin: 4px 0;
+}
+
+.context-menu-item .icon {
+  width: 14px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.context-menu-item.destructive {
+  color: var(--vscode-errorForeground, var(--vscode-terminal-ansiRed));
+}
+
+/* Color picker submenu */
+.color-picker {
+  display: flex;
+  gap: 6px;
+  padding: 6px 12px;
+}
+
+.color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.1s;
+}
+
+.color-swatch:hover {
+  border-color: var(--vscode-focusBorder);
 }

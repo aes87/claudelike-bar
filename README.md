@@ -74,7 +74,7 @@ git clone https://github.com/aes87/claudelike-bar.git
 cd claudelike-bar
 npm install && npm run build
 npx vsce package --allow-missing-repository
-code --install-extension claude-terminal-dashboard-*.vsix --force
+code --install-extension claudelike-bar-*.vsix --force
 ```
 
 Then reload VS Code. New icon appears in the activity bar. Click it. Marvel.

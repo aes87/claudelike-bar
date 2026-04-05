@@ -15,11 +15,35 @@ export function activate(context: vscode.ExtensionContext) {
     { webviewOptions: { retainContextWhenHidden: true } },
   );
 
-  // Handle tile clicks — switch to terminal
-  provider.onSwitchTerminal = (name: string) => {
-    const terminal = tracker.getTerminalByName(name);
-    if (terminal) {
-      terminal.show();
+  // Handle webview messages
+  provider.onMessage = (message) => {
+    const terminal = tracker.getTerminalById(message.id);
+
+    switch (message.type) {
+      case 'switchTerminal':
+        terminal?.show();
+        break;
+
+      case 'cloneTerminal':
+        if (terminal) {
+          const opts = terminal.creationOptions;
+          if (!opts || 'pty' in opts) break; // can't clone PTY-based terminals
+          vscode.window.createTerminal({
+            name: `${opts.name || terminal.name} (copy)`,
+            cwd: opts.cwd,
+            shellPath: opts.shellPath,
+            shellArgs: opts.shellArgs,
+          });
+        }
+        break;
+
+      case 'killTerminal':
+        terminal?.dispose();
+        break;
+
+      case 'setColor':
+        tracker.setColorOverride(message.id, message.color ?? undefined);
+        break;
     }
   };
 

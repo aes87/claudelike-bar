@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { TileData } from './types';
+import { TileData, WebviewMessage } from './types';
 
 export class DashboardProvider implements vscode.WebviewViewProvider {
   private view: vscode.WebviewView | undefined;
@@ -23,15 +23,13 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
 
     webviewView.webview.html = this.getHtml(webviewView.webview);
 
-    // Handle messages from webview (tile clicks)
+    // Handle messages from webview
     webviewView.webview.onDidReceiveMessage((message) => {
-      if (message.type === 'switchTerminal') {
-        this.onSwitchTerminal?.(message.name);
-      }
+      this.onMessage?.(message);
     });
   }
 
-  onSwitchTerminal?: (name: string) => void;
+  onMessage?: (message: WebviewMessage) => void;
 
   updateTiles(tiles: TileData[]): void {
     this.view?.webview.postMessage({ type: 'update', tiles });

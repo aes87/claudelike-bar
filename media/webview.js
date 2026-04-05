@@ -60,23 +60,23 @@ function diffUpdate(tiles) {
   if (emptyState) emptyState.remove();
 
   const existingEls = container.querySelectorAll('.tile');
-  const existingByName = new Map();
-  existingEls.forEach((el) => existingByName.set(el.dataset.name, el));
+  const existingById = new Map();
+  existingEls.forEach((el) => existingById.set(el.dataset.id, el));
 
-  const newNames = new Set(tiles.map((t) => t.name));
+  const newIds = new Set(tiles.map((t) => String(t.id)));
 
   // Remove tiles that no longer exist
-  for (const [name, el] of existingByName) {
-    if (!newNames.has(name)) {
+  for (const [id, el] of existingById) {
+    if (!newIds.has(id)) {
       el.remove();
-      existingByName.delete(name);
+      existingById.delete(id);
     }
   }
 
   // Update or create tiles in order
   let previousEl = null;
   tiles.forEach((tile, index) => {
-    let el = existingByName.get(tile.name);
+    let el = existingById.get(String(tile.id));
 
     if (el) {
       // Update existing tile in-place
@@ -111,8 +111,17 @@ function patchTile(el, tile) {
   // Active state
   el.classList.toggle('active', tile.isActive);
 
+  // Ignored tile class (for dashed border)
+  el.classList.toggle('status-ignored', tile.status === 'ignored');
+
   // Theme color
   el.style.setProperty('--tile-color', tile.themeColor);
+
+  // Name (may change via refreshNames)
+  const nameEl = el.querySelector('.tile-name');
+  if (nameEl && nameEl.textContent !== tile.name) {
+    nameEl.textContent = tile.name;
+  }
 
   // Status dot
   const dot = el.querySelector('.dot');
@@ -174,10 +183,10 @@ function patchTile(el, tile) {
  */
 function createTileEl(tile, index) {
   const el = document.createElement('div');
-  el.className = `tile entering${tile.isActive ? ' active' : ''}`;
+  el.className = `tile entering${tile.isActive ? ' active' : ''}${tile.status === 'ignored' ? ' status-ignored' : ''}`;
   el.style.setProperty('--tile-color', tile.themeColor);
   el.tabIndex = 0;
-  el.dataset.name = tile.name;
+  el.dataset.id = String(tile.id);
   el.setAttribute('role', 'button');
 
   const timeStr = formatRelativeTime(tile.lastActivity);
@@ -205,7 +214,11 @@ function createTileEl(tile, index) {
   el.setAttribute('aria-label', `${tile.name} — ${statusLabel}`);
 
   el.addEventListener('click', () => {
-    vscode.postMessage({ type: 'switchTerminal', name: tile.name });
+    vscode.postMessage({ type: 'switchTerminal', id: tile.id });
+  });
+
+  el.addEventListener('contextmenu', (e) => {
+    showContextMenu(e, tile.id);
   });
 
   el.addEventListener('focus', () => {
@@ -232,3 +245,119 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// --- Context menu ---
+
+const SWATCH_COLORS = [
+  { name: 'cyan', css: 'var(--vscode-terminal-ansiCyan)' },
+  { name: 'green', css: 'var(--vscode-terminal-ansiGreen)' },
+  { name: 'blue', css: 'var(--vscode-terminal-ansiBrightBlue)' },
+  { name: 'magenta', css: 'var(--vscode-terminal-ansiMagenta)' },
+  { name: 'yellow', css: 'var(--vscode-terminal-ansiYellow)' },
+  { name: 'white', css: 'var(--vscode-terminal-ansiBrightWhite)' },
+  { name: 'red', css: 'var(--vscode-terminal-ansiRed)' },
+];
+
+let activeMenu = null;
+
+function showContextMenu(e, tileId) {
+  e.preventDefault();
+  e.stopPropagation();
+  dismissContextMenu();
+
+  const menu = document.createElement('div');
+  menu.className = 'context-menu';
+
+  // Clone terminal
+  const cloneItem = menuItem('\u2750', 'Clone terminal', () => {
+    vscode.postMessage({ type: 'cloneTerminal', id: tileId });
+  });
+  menu.appendChild(cloneItem);
+
+  // Separator
+  menu.appendChild(menuSeparator());
+
+  // Set color — inline swatches
+  const colorLabel = document.createElement('div');
+  colorLabel.className = 'context-menu-item';
+  colorLabel.style.cursor = 'default';
+  colorLabel.style.opacity = '0.7';
+  colorLabel.style.fontSize = '11px';
+  colorLabel.innerHTML = '<span class="icon">\uD83C\uDFA8</span> Set color';
+  menu.appendChild(colorLabel);
+
+  const picker = document.createElement('div');
+  picker.className = 'color-picker';
+  for (const color of SWATCH_COLORS) {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-swatch';
+    swatch.style.background = color.css;
+    swatch.title = color.name;
+    swatch.addEventListener('click', () => {
+      vscode.postMessage({ type: 'setColor', id: tileId, color: color.name });
+      dismissContextMenu();
+    });
+    picker.appendChild(swatch);
+  }
+  menu.appendChild(picker);
+
+  // Reset color
+  const resetItem = menuItem('\u21BA', 'Reset to default', () => {
+    vscode.postMessage({ type: 'setColor', id: tileId, color: null });
+  });
+  resetItem.style.fontSize = '11px';
+  resetItem.style.opacity = '0.7';
+  menu.appendChild(resetItem);
+
+  // Separator
+  menu.appendChild(menuSeparator());
+
+  // Kill terminal
+  const killItem = menuItem('\u2715', 'Kill terminal', () => {
+    vscode.postMessage({ type: 'killTerminal', id: tileId });
+  });
+  killItem.classList.add('destructive');
+  menu.appendChild(killItem);
+
+  // Position
+  document.body.appendChild(menu);
+  const rect = menu.getBoundingClientRect();
+  let x = e.clientX;
+  let y = e.clientY;
+  if (x + rect.width > window.innerWidth) x = window.innerWidth - rect.width - 4;
+  if (y + rect.height > window.innerHeight) y = window.innerHeight - rect.height - 4;
+  menu.style.left = `${x}px`;
+  menu.style.top = `${y}px`;
+
+  activeMenu = menu;
+}
+
+function menuItem(icon, label, onClick) {
+  const item = document.createElement('div');
+  item.className = 'context-menu-item';
+  item.innerHTML = `<span class="icon">${icon}</span> ${escapeHtml(label)}`;
+  item.addEventListener('click', () => {
+    onClick();
+    dismissContextMenu();
+  });
+  return item;
+}
+
+function menuSeparator() {
+  const sep = document.createElement('div');
+  sep.className = 'context-menu-separator';
+  return sep;
+}
+
+function dismissContextMenu() {
+  if (activeMenu) {
+    activeMenu.remove();
+    activeMenu = null;
+  }
+}
+
+// Dismiss on click outside or Escape
+document.addEventListener('click', dismissContextMenu);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') dismissContextMenu();
+});
