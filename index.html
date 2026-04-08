@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Claudelike Bar — v0.4 UX Preview</title>
+  <title>Claudelike Bar — v0.5.1 UX Preview</title>
   <style>
     :root {
       --vscode-font-family: 'Segoe UI', system-ui, sans-serif;
@@ -185,7 +185,7 @@
   </div>
 
   <div class="legend">
-    <h2>claudelike-bar v0.4 — UX Preview</h2>
+    <h2>claudelike-bar v0.5.1 — UX Preview</h2>
 
     <div class="legend-section">
       <h3>Status indicators</h3>
@@ -197,8 +197,8 @@
     </div>
 
     <div class="legend-section">
-      <h3>Config file <span class="new-badge">NEW in v0.4</span></h3>
-      <div class="note">All settings in <code>.claudelike-bar.json</code> — auto-populated as you open terminals. Claude Code can read and edit it natively.</div>
+      <h3>Config file <span class="new-badge">NEW in v0.5</span></h3>
+      <div class="note">All settings in <code>.claudelike-bar.jsonc</code> (JSON with comments) — auto-populated as you open terminals. Claude Code can read and edit it natively.</div>
       <div class="config-block"><span class="config-key">"api"</span>: {
   <span class="config-key">"color"</span>: <span class="config-str">"yellow"</span>,
   <span class="config-key">"nickname"</span>: <span class="config-str">"backend"</span>,
@@ -230,14 +230,14 @@
     </div>
 
     <div class="legend-section">
-      <h3>v0.4 changes</h3>
+      <h3>v0.5.1 changes</h3>
       <div class="note">
-        1. <strong>Config file</strong> — <code>.claudelike-bar.json</code> replaces GUI settings. Auto-populates, Claude Code native<br>
-        2. <strong>Nicknames</strong> — display names on tiles (e.g. "api" shows as "backend")<br>
-        3. <strong>Auto-start</strong> — terminals can launch automatically on VS Code open<br>
-        4. <strong>Colors persisted</strong> — context-menu color changes saved to config file, survive restarts<br>
-        5. <strong>Bundled hooks</strong> — ready-to-use hook script + settings snippet in <code>hooks/</code><br>
-        6. <strong>Standalone install</strong> — no dependencies on author's environment
+        1. <strong>One-command setup</strong> — <code>./setup.sh</code> installs everything (hooks, build, extension)<br>
+        2. <strong>JSONC config</strong> — <code>.claudelike-bar.jsonc</code> with comments, organized into Big Knobs / Fine Tuning / Terminals sections<br>
+        3. <strong>Claude-first config</strong> — just tell Claude Code what to change, it edits the config natively<br>
+        4. <strong>Nicknames</strong> — display names on tiles (e.g. "api" shows as "backend")<br>
+        5. <strong>Auto-start</strong> — terminals can launch automatically on VS Code open<br>
+        6. <strong>Idempotent hooks</strong> — setup merges hooks into settings.json without clobbering existing ones
       </div>
     </div>
   </div>

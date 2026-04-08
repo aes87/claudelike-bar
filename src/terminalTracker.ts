@@ -1,19 +1,6 @@
 import * as vscode from 'vscode';
-import { TileData, SessionStatus, getThemeColor } from './types';
+import { TileData, SessionStatus, ICON_MAP, getThemeColor } from './types';
 import { ConfigManager } from './configManager';
-
-const IGNORED_TEXTS = [
-  'Being ignored :(',
-  'Hello? Anyone?',
-  "I'll just wait here then",
-  'This is fine',
-  'You have other terminals?',
-  'Patiently judging you',
-  'Still here btw',
-  "I guess I'm not important",
-  'Take your time, no rush',
-  "It's not like I'm waiting or anything",
-];
 
 export class TerminalTracker implements vscode.Disposable {
   private terminals = new Map<number, TileData>();
@@ -26,6 +13,12 @@ export class TerminalTracker implements vscode.Disposable {
   private nameRefreshTimer: ReturnType<typeof setInterval> | undefined;
   private nameRefreshIdleCycles = 0;
   private configManager: ConfigManager;
+
+  // State machine timers: ready → waiting after 60s
+  private readyTimers = new Map<number, NodeJS.Timeout>();
+
+  // Focus tracking: which tile was focused while in "waiting" state
+  private focusedWaitingTile: number | null = null;
 
   constructor(configManager: ConfigManager) {
     this.configManager = configManager;
@@ -62,6 +55,7 @@ export class TerminalTracker implements vscode.Disposable {
     // Auto-populate config file entry
     this.configManager.ensureEntry(name);
     const cfg = this.configManager.getTerminal(name);
+    const thresholds = this.configManager.getContextThresholds();
 
     const id = this.assignId(terminal);
     this.terminalRefs.set(id, terminal);
@@ -70,9 +64,13 @@ export class TerminalTracker implements vscode.Disposable {
       name,
       displayName: cfg?.nickname || name,
       status: 'idle',
+      statusLabel: this.configManager.getLabel('idle'),
       lastActivity: Date.now(),
       isActive: vscode.window.activeTerminal === terminal,
       themeColor: getThemeColor(name, cfg?.color),
+      icon: cfg?.icon ?? ICON_MAP[name] ?? null,
+      contextWarn: thresholds.warn,
+      contextCrit: thresholds.crit,
     });
   }
 
@@ -81,27 +79,43 @@ export class TerminalTracker implements vscode.Disposable {
     if (id !== undefined) {
       this.terminals.delete(id);
       this.terminalRefs.delete(id);
+      this.clearReadyTimer(id);
+      if (this.focusedWaitingTile === id) {
+        this.focusedWaitingTile = null;
+      }
     }
   }
 
   private handleActiveTerminalChange(active: vscode.Terminal | undefined): void {
     const activeId = active ? this.terminalIdMap.get(active) : undefined;
 
+    // Check if we're leaving a tile that was focused while waiting
+    if (this.focusedWaitingTile !== null && this.focusedWaitingTile !== activeId) {
+      const tile = this.terminals.get(this.focusedWaitingTile);
+      if (tile && (tile.status === 'waiting' || tile.status === 'ready')) {
+        // User looked and left without acting — mode-dependent transition
+        const mode = this.configManager.getMode();
+        if (mode === 'passive-aggressive') {
+          const texts = this.configManager.getIgnoredTexts();
+          tile.status = 'ignored';
+          tile.ignoredText = texts[Math.floor(Math.random() * texts.length)];
+          tile.statusLabel = tile.ignoredText;
+        } else {
+          tile.status = 'done';
+          tile.statusLabel = this.configManager.getLabel('done');
+          tile.ignoredText = undefined;
+        }
+        this.clearReadyTimer(tile.id);
+      }
+      this.focusedWaitingTile = null;
+    }
+
     for (const [id, tile] of this.terminals) {
       tile.isActive = id === activeId;
 
-      if (id === activeId) {
-        // User focused this terminal — clear waiting/ignored
-        if (tile.status === 'waiting' || tile.status === 'ignored') {
-          tile.status = 'idle';
-          tile.ignoredText = undefined;
-        }
-      } else {
-        // User focused a DIFFERENT terminal — waiting becomes ignored
-        if (tile.status === 'waiting') {
-          tile.status = 'ignored';
-          tile.ignoredText = IGNORED_TEXTS[Math.floor(Math.random() * IGNORED_TEXTS.length)];
-        }
+      // If focusing a tile that's waiting or ready, start tracking it
+      if (id === activeId && (tile.status === 'waiting' || tile.status === 'ready')) {
+        this.focusedWaitingTile = id;
       }
     }
   }
@@ -154,6 +168,7 @@ export class TerminalTracker implements vscode.Disposable {
             tile.name = name;
             tile.displayName = cfg?.nickname || name;
             tile.themeColor = getThemeColor(name, cfg?.color);
+            tile.icon = cfg?.icon ?? ICON_MAP[name] ?? null;
           }
           changed = true;
         }
@@ -175,39 +190,97 @@ export class TerminalTracker implements vscode.Disposable {
     }
   }
 
-  /** Re-apply config (colors, nicknames) to all tracked tiles. */
+  /** Re-apply config (colors, nicknames, icons, thresholds) to all tracked tiles. */
   refreshFromConfig(): void {
+    const thresholds = this.configManager.getContextThresholds();
     for (const [, tile] of this.terminals) {
       const cfg = this.configManager.getTerminal(tile.name);
       tile.displayName = cfg?.nickname || tile.name;
       tile.themeColor = getThemeColor(tile.name, cfg?.color);
+      tile.icon = cfg?.icon ?? ICON_MAP[tile.name] ?? null;
+      tile.contextWarn = thresholds.warn;
+      tile.contextCrit = thresholds.crit;
+      // Refresh status label (except ignored which uses custom text)
+      if (tile.status !== 'ignored') {
+        tile.statusLabel = this.configManager.getLabel(tile.status);
+      }
     }
     this.onChangeEmitter.fire();
   }
 
   updateStatus(projectName: string, status: SessionStatus, event?: string, contextPercent?: number): void {
     for (const [, tile] of this.terminals) {
-      if (tile.name === projectName) {
-        // Don't let hook events override waiting/ignored — only the user focusing the terminal clears those
-        if ((tile.status === 'waiting' || tile.status === 'ignored') && status === 'working') {
-          // A new prompt was submitted — user is interacting, clear the sticky state
-          if (event === 'UserPromptSubmit') {
-            tile.status = status;
-            tile.ignoredText = undefined;
-          }
-          // Otherwise ignore — keep waiting/ignored until user focuses
-        } else {
-          tile.status = status;
-          tile.ignoredText = undefined;
+      if (tile.name !== projectName) continue;
+
+      let changed = false;
+
+      // UserPromptSubmit is the universal reset — always goes to working
+      if (event === 'UserPromptSubmit') {
+        tile.status = 'working';
+        tile.statusLabel = this.configManager.getLabel('working');
+        tile.ignoredText = undefined;
+        this.clearReadyTimer(tile.id);
+        if (this.focusedWaitingTile === tile.id) {
+          this.focusedWaitingTile = null;
         }
-        tile.lastActivity = Date.now();
-        tile.event = event;
-        if (contextPercent !== undefined) {
-          tile.contextPercent = contextPercent;
+        changed = true;
+      } else if (status === 'ready') {
+        // Stop/Notification → ready, then 60s timer → waiting
+        if (tile.status !== 'ready') {
+          tile.status = 'ready';
+          tile.statusLabel = this.configManager.getLabel('ready');
+          tile.ignoredText = undefined;
+          this.startReadyTimer(tile.id);
+          changed = true;
+        }
+        // If already ready, ignore (no-op — handles Stop/Notification race)
+      } else if (status === 'working') {
+        // PreToolUse → working (only if not in a sticky end state without user action)
+        if (tile.status !== 'done' && tile.status !== 'ignored') {
+          tile.status = 'working';
+          tile.statusLabel = this.configManager.getLabel('working');
+          tile.ignoredText = undefined;
+          this.clearReadyTimer(tile.id);
+          changed = true;
         }
       }
+
+      if (changed) {
+        tile.lastActivity = Date.now();
+        tile.event = event;
+      }
+      if (contextPercent !== undefined) {
+        tile.contextPercent = contextPercent;
+      }
+      break; // terminal names are unique
     }
     this.onChangeEmitter.fire();
+  }
+
+  private startReadyTimer(id: number): void {
+    this.clearReadyTimer(id);
+    const timer = setTimeout(() => {
+      this.readyTimers.delete(id);
+      const tile = this.terminals.get(id);
+      if (tile && tile.status === 'ready') {
+        tile.status = 'waiting';
+        tile.statusLabel = this.configManager.getLabel('waiting');
+        // If this tile is currently focused, start tracking it
+        if (tile.isActive) {
+          this.focusedWaitingTile = id;
+        }
+        this.onChangeEmitter.fire();
+      }
+    }, 60_000);
+    this.readyTimers.set(id, timer);
+  }
+
+  private clearReadyTimer(id: number): void {
+    const existing = this.readyTimers.get(id);
+    if (existing) {
+      clearTimeout(existing);
+      this.readyTimers.delete(id);
+    }
   }
 
   setColor(id: number, color: string | undefined): void {
@@ -234,9 +307,9 @@ export class TerminalTracker implements vscode.Disposable {
   getTiles(): TileData[] {
     const tiles = Array.from(this.terminals.values());
 
-    const statusOrder: Record<string, number> = { waiting: 0, ignored: 1, working: 2, done: 3, idle: 4 };
+    const statusOrder: Record<string, number> = { waiting: 0, ignored: 1, ready: 2, working: 3, done: 4, idle: 5 };
     tiles.sort((a, b) => {
-      const orderDiff = (statusOrder[a.status] ?? 4) - (statusOrder[b.status] ?? 4);
+      const orderDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
       if (orderDiff !== 0) return orderDiff;
       return b.lastActivity - a.lastActivity;
     });
@@ -259,6 +332,10 @@ export class TerminalTracker implements vscode.Disposable {
 
   dispose(): void {
     this.stopNameRefresh();
+    for (const timer of this.readyTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.readyTimers.clear();
     for (const d of this.disposables) d.dispose();
     this.terminals.clear();
     this.terminalRefs.clear();

@@ -62,7 +62,7 @@ body {
   transform: translateY(0);
 }
 
-/* Tile top row: dot + name + time + ctx */
+/* Tile top row: dot + icon + name + time + ctx */
 .tile-header {
   display: flex;
   align-items: center;
@@ -82,6 +82,14 @@ body {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
   white-space: nowrap;
+}
+
+/* Tile icon — codicon glyph colored to match tile theme */
+.tile-icon {
+  font-size: 14px;
+  min-width: 16px;
+  text-align: center;
+  color: var(--tile-color);
 }
 
 /* Context % badge */
@@ -105,7 +113,7 @@ body {
   font-size: 11px;
   color: var(--vscode-descriptionForeground);
   margin-top: 3px;
-  padding-left: 18px; /* align with text after dot */
+  padding-left: 42px; /* align with name after dot + icon */
 }
 
 .tile-status.status-ignored {
@@ -130,6 +138,11 @@ body {
   animation: pulse 1.5s ease-in-out infinite;
 }
 
+.dot.ready {
+  background: var(--vscode-terminal-ansiCyan);
+  animation: ready-pulse 2s ease-in-out infinite;
+}
+
 .dot.waiting {
   background: var(--vscode-terminal-ansiYellow);
   animation: blink 1s step-end infinite;
@@ -137,7 +150,7 @@ body {
 
 .dot.done {
   background: var(--vscode-terminal-ansiCyan);
-  animation: fade-out 30s ease-out forwards;
+  opacity: 0.5;
 }
 
 .dot.ignored {
@@ -158,14 +171,14 @@ body {
   50% { opacity: 0.4; transform: scale(0.85); }
 }
 
+@keyframes ready-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.15; }
-}
-
-@keyframes fade-out {
-  0%, 80% { opacity: 1; }
-  100% { opacity: 0.2; }
 }
 
 @keyframes ignored-pulse {

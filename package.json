@@ -2,26 +2,52 @@
   "name": "claudelike-bar",
   "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "publisher": "aes87",
-  "engines": { "vscode": "^1.93.0" },
-  "categories": ["Other"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activitybar": [{
-        "id": "claude-dashboard",
-        "title": "Claudelike Bar",
-        "icon": "media/dashboard.svg"
-      }]
+      "activitybar": [
+        {
+          "id": "claude-dashboard",
+          "title": "Claudelike Bar",
+          "icon": "media/dashboard.svg"
+        }
+      ]
     },
     "views": {
-      "claude-dashboard": [{
-        "type": "webview",
-        "id": "claudeDashboard.mainView",
-        "name": "Terminals"
-      }]
+      "claude-dashboard": [
+        {
+          "type": "webview",
+          "id": "claudeDashboard.mainView",
+          "name": "Terminals"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "claudeDashboard.openConfig",
+        "title": "Open Config",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "claudeDashboard.openConfig",
+          "when": "view == claudeDashboard.mainView",
+          "group": "navigation"
+        }
+      ]
     }
   },
   "scripts": {
@@ -29,10 +55,14 @@
     "watch": "npm run build -- --watch",
     "package": "npm run build && vsce package --allow-missing-repository"
   },
+  "dependencies": {
+    "jsonc-parser": "^3.3.1"
+  },
   "devDependencies": {
     "@types/vscode": "^1.93.0",
+    "@vscode/codicons": "^0.0.45",
+    "@vscode/vsce": "^2.24.0",
     "esbuild": "^0.20.0",
-    "typescript": "^5.4.0",
-    "@vscode/vsce": "^2.24.0"
+    "typescript": "^5.4.0"
   }
 }

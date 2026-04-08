@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { StatusFileData, SessionStatus } from './types';
+import { StatusFileData } from './types';
 
 const STATUS_DIR = '/tmp/claude-dashboard';
 
@@ -10,7 +10,6 @@ export class StatusWatcher implements vscode.Disposable {
   private disposables: vscode.Disposable[] = [];
   private onStatusChangeEmitter = new vscode.EventEmitter<StatusFileData>();
   readonly onStatusChange = this.onStatusChangeEmitter.event;
-  private doneTimers = new Map<string, NodeJS.Timeout>();
 
   constructor() {
     this.ensureDir();
@@ -50,27 +49,6 @@ export class StatusWatcher implements vscode.Disposable {
       // Statusline writes may only have context_percent, no status
       if (!data.status && data.context_percent === undefined) return;
 
-      // Clear any existing done->idle timer for this project
-      const existingTimer = this.doneTimers.get(data.project);
-      if (existingTimer) {
-        clearTimeout(existingTimer);
-        this.doneTimers.delete(data.project);
-      }
-
-      // If done, set a 30s timer to fade to idle
-      if (data.status === 'done') {
-        const timer = setTimeout(() => {
-          this.doneTimers.delete(data.project);
-          this.onStatusChangeEmitter.fire({
-            project: data.project,
-            status: 'idle' as SessionStatus,
-            timestamp: Math.floor(Date.now() / 1000),
-            event: 'fade',
-          });
-        }, 30_000);
-        this.doneTimers.set(data.project, timer);
-      }
-
       this.onStatusChangeEmitter.fire(data);
     } catch {
       // Ignore malformed files
@@ -90,10 +68,6 @@ export class StatusWatcher implements vscode.Disposable {
   }
 
   dispose(): void {
-    for (const timer of this.doneTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.doneTimers.clear();
     for (const d of this.disposables) d.dispose();
   }
 }

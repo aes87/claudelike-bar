@@ -1,5 +1,8 @@
 src/**
+scripts/**
 tsconfig.json
 PLAN.md
+CLAUDE.md
+setup.sh
 node_modules/**
 .gitignore

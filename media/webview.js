@@ -4,14 +4,6 @@
 const vscode = acquireVsCodeApi();
 const container = document.getElementById('tiles-container');
 
-const STATUS_LABELS = {
-  idle: 'Idle',
-  working: 'Working',
-  waiting: 'Waiting for input',
-  done: 'Done',
-  ignored: '', // uses custom ignoredText
-};
-
 let currentTiles = [];
 let selectedIndex = -1;
 
@@ -124,6 +116,27 @@ function patchTile(el, tile) {
     nameEl.textContent = displayName;
   }
 
+  // Icon
+  const iconEl = el.querySelector('.tile-icon');
+  if (tile.icon) {
+    const expectedClass = `tile-icon codicon codicon-${tile.icon}`;
+    if (iconEl) {
+      if (iconEl.className !== expectedClass) {
+        iconEl.className = expectedClass;
+      }
+    } else {
+      // Insert icon after the dot
+      const dot = el.querySelector('.dot');
+      if (dot) {
+        const icon = document.createElement('span');
+        icon.className = expectedClass;
+        dot.after(icon);
+      }
+    }
+  } else if (iconEl) {
+    iconEl.remove();
+  }
+
   // Status dot
   const dot = el.querySelector('.dot');
   if (dot) {
@@ -144,7 +157,7 @@ function patchTile(el, tile) {
   // Context %
   const ctxEl = el.querySelector('.tile-ctx');
   if (tile.contextPercent !== undefined && tile.contextPercent > 0) {
-    const ctxClass = tile.contextPercent >= 80 ? 'ctx-crit' : tile.contextPercent >= 60 ? 'ctx-warn' : '';
+    const ctxClass = tile.contextPercent >= tile.contextCrit ? 'ctx-crit' : tile.contextPercent >= tile.contextWarn ? 'ctx-warn' : '';
     if (ctxEl) {
       ctxEl.textContent = `ctx ${tile.contextPercent}%`;
       ctxEl.className = `tile-ctx ${ctxClass}`;
@@ -165,18 +178,14 @@ function patchTile(el, tile) {
   // Status text
   const statusEl = el.querySelector('.tile-status');
   if (statusEl) {
-    const label = tile.status === 'ignored'
-      ? (tile.ignoredText || 'Being ignored :(')
-      : (STATUS_LABELS[tile.status] || tile.status);
+    const label = tile.statusLabel || tile.status;
     statusEl.textContent = label;
     statusEl.className = `tile-status${tile.status === 'ignored' ? ' status-ignored' : ''}`;
   }
 
   // Aria
   const ariaDisplayName = tile.displayName || tile.name;
-  const label = tile.status === 'ignored'
-    ? tile.ignoredText || 'Being ignored'
-    : (STATUS_LABELS[tile.status] || tile.status);
+  const label = tile.statusLabel || tile.status;
   el.setAttribute('aria-label', `${ariaDisplayName} — ${label}`);
 }
 
@@ -193,25 +202,28 @@ function createTileEl(tile, index) {
 
   const displayName = tile.displayName || tile.name;
   const timeStr = formatRelativeTime(tile.lastActivity);
-  const statusLabel = tile.status === 'ignored'
-    ? (tile.ignoredText || 'Being ignored :(')
-    : (STATUS_LABELS[tile.status] || tile.status);
+  const statusLabel = tile.statusLabel || tile.status;
   const dotClass = tile.status === 'ignored' ? 'ignored' : tile.status;
+
+  const iconHtml = tile.icon
+    ? `<span class="tile-icon codicon codicon-${escapeHtml(tile.icon)}"></span>`
+    : '';
 
   let ctxHtml = '';
   if (tile.contextPercent !== undefined && tile.contextPercent > 0) {
-    const ctxClass = tile.contextPercent >= 80 ? 'ctx-crit' : tile.contextPercent >= 60 ? 'ctx-warn' : '';
+    const ctxClass = tile.contextPercent >= tile.contextCrit ? 'ctx-crit' : tile.contextPercent >= tile.contextWarn ? 'ctx-warn' : '';
     ctxHtml = `<span class="tile-ctx ${ctxClass}">ctx ${tile.contextPercent}%</span>`;
   }
 
   el.innerHTML = `
     <div class="tile-header">
       <span class="dot ${dotClass}"></span>
+      ${iconHtml}
       <span class="tile-name">${escapeHtml(displayName)}</span>
       ${tile.status !== 'idle' ? `<span class="tile-time">${timeStr}</span>` : '<span class="tile-time"></span>'}
       ${ctxHtml}
     </div>
-    <div class="tile-status${tile.status === 'ignored' ? ' status-ignored' : ''}">${statusLabel}</div>
+    <div class="tile-status${tile.status === 'ignored' ? ' status-ignored' : ''}">${escapeHtml(statusLabel)}</div>
   `;
 
   el.setAttribute('aria-label', `${displayName} — ${statusLabel}`);

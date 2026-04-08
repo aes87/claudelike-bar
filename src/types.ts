@@ -1,15 +1,19 @@
-export type SessionStatus = 'idle' | 'working' | 'waiting' | 'done' | 'ignored';
+export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored';
 
 export interface TileData {
   id: number; // stable numeric identity ��� used as DOM key and in webview messages
   name: string;
   displayName: string; // nickname from config, or same as name
   status: SessionStatus;
+  statusLabel: string; // resolved display text from config labels
   lastActivity: number; // unix timestamp
   event?: string;
   isActive: boolean;
   themeColor: string; // CSS variable name for the ANSI color
+  icon: string | null; // codicon name (e.g. "calendar", "server")
   contextPercent?: number;
+  contextWarn: number; // threshold for yellow
+  contextCrit: number; // threshold for red
   ignoredText?: string;
 }
 
@@ -87,3 +91,29 @@ export function getThemeColor(projectName: string, override?: string): string {
   }
   return THEME_CSS_VARS[getDefaultColor(projectName)];
 }
+
+export const ICON_MAP: Record<string, string> = {
+  '3d-printing': 'package',
+  'api': 'server',
+  'automated-martha-tek': 'beaker',
+  'container-backup': 'archive',
+  'financial-planner': 'graph',
+  'garden-assist': 'leaf',
+  'git-publishing': 'book',
+  'ha-tools': 'home',
+  'health-dash': 'heart',
+  'life-planner': 'calendar',
+  'media-recs': 'play',
+  'mortgage-viz': 'graph-line',
+  'obsidian-vault': 'notebook',
+  'prompt-master': 'wand',
+  'research-workflows': 'search',
+  'scripts': 'tools',
+  'strudel-noodle': 'flame',
+  'travel-planner': 'globe',
+  'secrets-manager': 'lock',
+  'vscode-enhancement': 'settings-gear',
+  'web-auto': 'robot',
+  'web-design-pipeline': 'paintcan',
+  'web-hosting': 'cloud',
+};

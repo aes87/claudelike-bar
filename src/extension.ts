@@ -17,6 +17,15 @@ export function activate(context: vscode.ExtensionContext) {
     { webviewOptions: { retainContextWhenHidden: true } },
   );
 
+  // Register gear icon command — opens config file in editor
+  const openConfigCmd = vscode.commands.registerCommand(
+    'claudeDashboard.openConfig',
+    () => {
+      const configPath = configManager.getConfigPath();
+      vscode.window.showTextDocument(vscode.Uri.file(configPath));
+    },
+  );
+
   // Handle webview messages
   provider.onMessage = (message) => {
     const terminal = tracker.getTerminalById(message.id);
@@ -63,7 +72,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // Refresh tiles when config file changes (color/nickname edits)
+  // Refresh tiles when config file changes (color/nickname/mode edits)
   const configSub = configManager.onChange(tracker.refreshFromConfig.bind(tracker));
 
   // Auto-start terminals marked in config
@@ -77,7 +86,7 @@ export function activate(context: vscode.ExtensionContext) {
   // Periodic refresh for relative time display (every 30s)
   const interval = setInterval(refreshTiles, 30_000);
 
-  context.subscriptions.push(registration, tracker, watcher, configManager, configSub, {
+  context.subscriptions.push(registration, openConfigCmd, tracker, watcher, configManager, configSub, {
     dispose: () => clearInterval(interval),
   });
 }
