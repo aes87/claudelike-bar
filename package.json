@@ -2,7 +2,7 @@
   "name": "claudelike-bar",
   "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "publisher": "aes87",
   "engines": {
     "vscode": "^1.93.0"
@@ -51,7 +51,7 @@
     }
   },
   "scripts": {
-    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --platform=node --external:vscode --format=cjs",
+    "build": "esbuild src/extension.ts --bundle --outfile=dist/extension.js --platform=node --external:vscode --format=cjs --main-fields=module,main",
     "watch": "npm run build -- --watch",
     "package": "npm run build && vsce package --allow-missing-repository"
   },

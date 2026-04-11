@@ -203,9 +203,24 @@ This requires `jq`. The base extension does not.
 
 ## Troubleshooting
 
+**Extension crashes on activation (`Cannot find module './impl/format'`)**
+- This happens when the esbuild bundle didn't properly inline `jsonc-parser`'s internal modules. Rebuild:
+  ```bash
+  npm run build && npm run package
+  code --install-extension claudelike-bar-*.vsix --force
+  ```
+  Then reload VS Code. The build script uses `--main-fields=module,main` to resolve the ESM build of jsonc-parser, which bundles correctly.
+- To check activation status: `grep -A2 "claudelike-bar" ~/.vscode-server/data/logs/*/exthost*/remoteexthost.log`
+
 **Sidebar shows "No terminals open"**
 - Reload VS Code after installing
-- Open at least one terminal (plain shell terminals named "bash"/"zsh" are filtered out — use Claude Code or named terminals)
+- Open at least one named terminal — plain shell terminals named "bash"/"zsh"/"sh" are filtered out. Use a VS Code terminal profile or rename the terminal
+- If the extension failed to activate (check the log above), no terminals will ever appear — fix the activation error first
+
+**Tiles stuck on "Working" — never show "Ready for input"**
+- The `dashboard-status.sh` hook must be registered on **all 4 events**: `PreToolUse`, `UserPromptSubmit`, `Stop`, and `Notification`. If Stop/Notification are missing, the bar never sees the "finished" signal
+- Re-run `./setup.sh` or `node scripts/merge-hooks.js` to add any missing events — both are idempotent
+- Verify: `grep dashboard-status ~/.claude/settings.json` should show the hook under all 4 events
 
 **Tiles appear but never update status**
 - Check hooks are registered: `grep dashboard-status ~/.claude/settings.json`
@@ -216,6 +231,11 @@ This requires `jq`. The base extension does not.
 **Extension not showing in activity bar**
 - Make sure you installed the `.vsix`, not just cloned the repo
 - Check Extensions panel for "Claudelike Bar" — it should be listed and enabled
+
+**Broke after container rebuild / VS Code update**
+- The extension is reinstalled from the VSIX on container start, but the VS Code server (and its Node.js runtime) may have changed. If the extension was built with an older esbuild config, the bundle may not work with the new runtime
+- Rebuild from source: `npm run build && npm run package && code --install-extension claudelike-bar-*.vsix --force`
+- Check activation logs for the specific error
 
 ## Upgrading
 
