@@ -13,7 +13,7 @@ export class TerminalTracker implements vscode.Disposable {
   private nameRefreshTimer: ReturnType<typeof setInterval> | undefined;
   private nameRefreshIdleCycles = 0;
   private configManager: ConfigManager;
-  private log: (msg: string) => void;
+  private log: (msg: string | (() => string)) => void;
 
   // State machine timers: ready → waiting after 60s
   private readyTimers = new Map<number, NodeJS.Timeout>();
@@ -21,7 +21,7 @@ export class TerminalTracker implements vscode.Disposable {
   // Focus tracking: which tile was focused while in "waiting" state
   private focusedWaitingTile: number | null = null;
 
-  constructor(configManager: ConfigManager, log?: (msg: string) => void) {
+  constructor(configManager: ConfigManager, log?: (msg: string | (() => string)) => void) {
     this.configManager = configManager;
     this.log = log ?? (() => {});
     // Track existing terminals
@@ -253,9 +253,9 @@ export class TerminalTracker implements vscode.Disposable {
       if (changed) {
         tile.lastActivity = Date.now();
         tile.event = event;
-        this.log(`transition ${tile.name}: ${prev} → ${tile.status} (event=${event ?? '-'})`);
+        this.log(() => `transition ${tile.name}: ${prev} → ${tile.status} (event=${event ?? '-'})`);
       } else {
-        this.log(`no-op ${tile.name}: stayed ${prev} (event=${event ?? '-'}, incoming=${status})`);
+        this.log(() => `no-op ${tile.name}: stayed ${prev} (event=${event ?? '-'}, incoming=${status})`);
       }
       if (contextPercent !== undefined) {
         tile.contextPercent = contextPercent;
@@ -263,8 +263,14 @@ export class TerminalTracker implements vscode.Disposable {
       break; // terminal names are unique
     }
     if (!matched) {
-      const names = Array.from(this.terminals.values()).map((t) => t.name).join(', ');
-      this.log(`unmatched status for "${projectName}" (tracked: [${names}])`);
+      // Lazy — the join() only runs when debug is actually on.
+      this.log(() => {
+        const names = Array.from(this.terminals.values()).map((t) => t.name).join(', ');
+        return `unmatched status for "${projectName}" (tracked: [${names}])`;
+      });
+      // Don't fire onChange for unmatched events — no tile changed, a repaint
+      // would be pure waste. Mirrors the `updateContext` pattern.
+      return;
     }
     this.onChangeEmitter.fire();
   }
@@ -375,10 +381,9 @@ export class TerminalTracker implements vscode.Disposable {
       if (tile) orderedNames.push(tile.name);
     }
     if (orderedNames.length === 0) return;
-    this.configManager.setOrder(orderedNames);
-    // Dragging is an explicit "I want manual order" signal — flip the mode if
-    // it isn't already set, so the drag takes effect immediately.
-    this.configManager.setSortMode('manual');
+    // Single atomic call — ConfigManager owns both the order write and the
+    // sortMode flip, so policy lives in one place.
+    this.configManager.applyDragOrder(orderedNames);
     this.log(`reorder: ${orderedNames.join(', ')}`);
     this.onChangeEmitter.fire();
   }

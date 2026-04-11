@@ -2,7 +2,7 @@
   "name": "claudelike-bar",
   "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "aes87",
   "engines": {
     "vscode": "^1.93.0"
@@ -14,6 +14,12 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Auto-start commands (sent into terminals via sendText) are disabled in untrusted workspaces because they execute shell commands from a workspace-controlled config file."
+    }
+  },
   "contributes": {
     "viewsContainers": {
       "activitybar": [

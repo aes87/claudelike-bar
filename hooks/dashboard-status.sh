@@ -31,8 +31,14 @@ fi
 EVENT=""
 CWD=""
 if [ -n "$INPUT" ] && command -v jq >/dev/null 2>&1; then
-  EVENT=$(printf '%s' "$INPUT" | jq -r '.hook_event_name // empty' 2>/dev/null)
-  CWD=$(printf '%s' "$INPUT" | jq -r '.cwd // empty' 2>/dev/null)
+  # Single jq invocation extracting both fields — the hook runs 4+ times per
+  # Claude turn, so avoid forking jq twice. @tsv is safe here: neither field
+  # can legitimately contain a tab or newline (hook_event_name is a fixed
+  # enum, cwd is a filesystem path and tabs in paths are absurd).
+  JQ_OUT=$(printf '%s' "$INPUT" | jq -r '[.hook_event_name // "", .cwd // ""] | @tsv' 2>/dev/null)
+  if [ -n "$JQ_OUT" ]; then
+    IFS=$'\t' read -r EVENT CWD <<< "$JQ_OUT"
+  fi
 fi
 
 # Fallbacks for event + cwd

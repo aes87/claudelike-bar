@@ -7,16 +7,37 @@ import { ConfigManager } from './configManager';
 
 const STATUS_DIR = '/tmp/claude-dashboard';
 const DEBUG_FLAG = `${STATUS_DIR}/.debug`;
+const AUTO_START_REVIVE_GRACE_MS = 1200;
+
+/**
+ * Wrap a string in POSIX shell single quotes, escaping any embedded single
+ * quotes via the `'\''` pattern. The result is safe to concatenate into any
+ * bash/zsh command line — single-quoted strings have no interpretation
+ * except the closing quote itself.
+ *
+ * Do NOT use `JSON.stringify` for shell quoting: JSON escaping is not the
+ * same as bash double-quoted-string escaping, and `$`, backticks, and `\`
+ * remain active inside double quotes. Terminal keys in the config file
+ * flow through this function into `terminal.sendText`, so getting this
+ * wrong is a shell injection vector.
+ */
+function shSingleQuote(s: string): string {
+  return `'${s.replace(/'/g, `'\\''`)}'`;
+}
+
+type LogFn = (msg: string | (() => string)) => void;
 
 export function activate(context: vscode.ExtensionContext) {
   const configManager = new ConfigManager();
 
-  // Debug output channel — always created, only written to when debug is on
+  // Debug output channel — always created, only written to when debug is on.
+  // Accepts a thunk so callers can defer expensive string building.
   const output = vscode.window.createOutputChannel('Claudelike Bar');
-  const log = (msg: string) => {
+  const log: LogFn = (msg) => {
     if (!configManager.isDebugEnabled()) return;
     const ts = new Date().toISOString().slice(11, 19);
-    output.appendLine(`[${ts}] ${msg}`);
+    const text = typeof msg === 'function' ? msg() : msg;
+    output.appendLine(`[${ts}] ${text}`);
   };
 
   // Sync the hook's debug flag file with the config setting
@@ -101,7 +122,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Refresh tiles on status file changes
   watcher.onStatusChange((data) => {
-    log(`status-file project=${data.project} status=${data.status ?? '-'} event=${data.event ?? '-'} ctx=${data.context_percent ?? '-'}`);
+    log(() => `status-file project=${data.project} status=${data.status ?? '-'} event=${data.event ?? '-'} ctx=${data.context_percent ?? '-'}`);
     if (data.status) {
       tracker.updateStatus(data.project, data.status, data.event, data.context_percent);
     } else if (data.context_percent !== undefined) {
@@ -115,42 +136,80 @@ export function activate(context: vscode.ExtensionContext) {
     tracker.refreshFromConfig();
   });
 
-  // Auto-start terminals marked in config.
-  // Delayed so VS Code's persistent-session revival (enablePersistentSessions)
-  // has time to restore terminals from the previous window. If a revived
-  // terminal with a given name shows up before the timeout fires, we skip it
-  // instead of creating a duplicate.
-  const autoStartNames = configManager.getAutoStartTerminals();
-  log(`auto-starting ${autoStartNames.length} terminal(s) after revive grace period: ${autoStartNames.join(', ')}`);
-  const autoStartTimer = setTimeout(() => {
-    for (const name of autoStartNames) {
-      if (tracker.getTerminalByName(name)) {
-        log(`  ${name} → revived (skip)`);
-        continue;
-      }
-      const terminal = vscode.window.createTerminal({ name });
-      // Export CLAUDELIKE_BAR_NAME so the hook script knows which tile to update,
-      // even from subdirectories or non-standard cwd (e.g. Vault Direct).
-      terminal.sendText(`export CLAUDELIKE_BAR_NAME=${JSON.stringify(name)}`);
-      const command = configManager.getAutoStartCommand(name);
-      if (command) {
-        log(`  ${name} → ${command}`);
-        terminal.sendText(command);
-      } else {
-        log(`  ${name} → (no command)`);
-      }
-    }
-  }, 1200);
-
   // Periodic refresh for relative time display (every 30s)
   const interval = setInterval(refreshTiles, 30_000);
 
-  context.subscriptions.push(registration, openConfigCmd, tracker, watcher, configManager, configSub, output, {
+  // Auto-start timer disposable — created before the timer itself so the
+  // disposable is pushed onto context.subscriptions atomically with the
+  // timer's creation. A setTimeout that fires after deactivation would hit
+  // a disposed tracker.
+  let autoStartTimer: ReturnType<typeof setTimeout> | undefined;
+  const timerDisposable: vscode.Disposable = {
     dispose: () => {
-      clearTimeout(autoStartTimer);
+      if (autoStartTimer) clearTimeout(autoStartTimer);
       clearInterval(interval);
     },
-  });
+  };
+
+  context.subscriptions.push(
+    registration,
+    openConfigCmd,
+    tracker,
+    watcher,
+    configManager,
+    configSub,
+    output,
+    timerDisposable,
+  );
+
+  // Auto-start is shell-command execution driven by a workspace-local config
+  // file — in untrusted workspaces it's a remote-code-execution vector, so
+  // it's gated behind workspace trust. The `capabilities.untrustedWorkspaces`
+  // declaration in package.json tells VS Code to run the extension in
+  // limited mode in untrusted workspaces; this block is the runtime side
+  // of that contract.
+  if (!vscode.workspace.isTrusted) {
+    log('workspace is untrusted — auto-start disabled');
+  } else {
+    autoStartTimer = setTimeout(
+      () => runAutoStart(configManager, tracker, log),
+      AUTO_START_REVIVE_GRACE_MS,
+    );
+  }
+}
+
+/**
+ * Create terminals marked `autoStart: true` in the config, export the
+ * `CLAUDELIKE_BAR_NAME` env var so the hook script can map the terminal
+ * to a tile, then send the configured command. Runs after a grace period
+ * so VS Code's persistent-session revival can restore terminals from the
+ * previous window first — revived terminals get a `revived (skip)` log
+ * entry and are left alone.
+ */
+function runAutoStart(
+  configManager: ConfigManager,
+  tracker: TerminalTracker,
+  log: LogFn,
+): void {
+  const autoStartNames = configManager.getAutoStartTerminals();
+  log(`auto-starting ${autoStartNames.length} terminal(s): ${autoStartNames.join(', ')}`);
+
+  for (const name of autoStartNames) {
+    if (tracker.getTerminalByName(name)) {
+      log(`  ${name} → revived (skip)`);
+      continue;
+    }
+    const terminal = vscode.window.createTerminal({ name });
+    // Shell-single-quote the name — JSON.stringify is NOT safe bash quoting.
+    terminal.sendText(`export CLAUDELIKE_BAR_NAME=${shSingleQuote(name)}`);
+    const command = configManager.getAutoStartCommand(name);
+    if (command) {
+      log(`  ${name} → ${command}`);
+      terminal.sendText(command);
+    } else {
+      log(`  ${name} → (no command)`);
+    }
+  }
 }
 
 export function deactivate() {

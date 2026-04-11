@@ -8,6 +8,8 @@ let currentTiles = [];
 let selectedIndex = -1;
 let draggingId = null;
 let suppressNextClick = false;
+/** The tile element currently decorated with a drop-indicator class. */
+let dropIndicatorEl = null;
 
 // Handle messages from extension
 window.addEventListener('message', (event) => {
@@ -275,16 +277,13 @@ function createTileEl(tile, index) {
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     const rect = el.getBoundingClientRect();
     const before = e.clientY < rect.top + rect.height / 2;
-    clearDropIndicators();
-    el.classList.add(before ? 'drop-before' : 'drop-after');
+    setDropIndicator(el, before ? 'drop-before' : 'drop-after');
   });
 
-  el.addEventListener('dragleave', (e) => {
-    // Only clear if actually leaving this tile (not entering a child)
-    if (e.target === el) {
-      el.classList.remove('drop-before', 'drop-after');
-    }
-  });
+  // No `dragleave` listener — setDropIndicator always clears the previous
+  // target before marking the new one, so stale indicators aren't possible.
+  // The old approach (querySelectorAll on every dragover frame) caused style
+  // recalc + layout thrash at ~60fps for zero benefit.
 
   el.addEventListener('drop', (e) => {
     if (!draggingId || draggingId === el.dataset.id) return;
@@ -298,10 +297,25 @@ function createTileEl(tile, index) {
   return el;
 }
 
-function clearDropIndicators() {
-  container.querySelectorAll('.drop-before, .drop-after').forEach((el) => {
+/** Move the drop-indicator decoration to `el`, clearing any previous target. */
+function setDropIndicator(el, cls) {
+  if (dropIndicatorEl && dropIndicatorEl !== el) {
+    dropIndicatorEl.classList.remove('drop-before', 'drop-after');
+  }
+  if (dropIndicatorEl !== el) {
+    dropIndicatorEl = el;
+  } else {
+    // Same element — clear stale side before re-adding the new one
     el.classList.remove('drop-before', 'drop-after');
-  });
+  }
+  el.classList.add(cls);
+}
+
+function clearDropIndicators() {
+  if (dropIndicatorEl) {
+    dropIndicatorEl.classList.remove('drop-before', 'drop-after');
+    dropIndicatorEl = null;
+  }
 }
 
 function commitDrop(draggedId, targetId, before) {

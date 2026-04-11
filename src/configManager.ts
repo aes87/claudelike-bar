@@ -247,6 +247,27 @@ export class ConfigManager implements vscode.Disposable {
     this.scheduleSave();
   }
 
+  /**
+   * Atomic drag-reorder: clear stale `order` values on every terminal entry,
+   * assign sequential orders to the provided names, and flip `sortMode` to
+   * `"manual"`. Called by the tracker when the user drags a tile. Keeps the
+   * "dragging implies manual sort" policy in one place.
+   */
+  applyDragOrder(orderedNames: string[]): void {
+    if (orderedNames.length === 0) return;
+    // Wipe all orders first — avoids collisions with entries for terminals
+    // that aren't currently open but still have a stale `order` field.
+    for (const cfg of Object.values(this.config.terminals)) {
+      delete cfg.order;
+    }
+    orderedNames.forEach((name, index) => {
+      const entry = this.config.terminals[name];
+      if (entry) entry.order = index;
+    });
+    this.config.sortMode = 'manual';
+    this.scheduleSave();
+  }
+
   /** True if any terminal has an explicit `order` set. */
   hasExplicitOrder(): boolean {
     for (const cfg of Object.values(this.config.terminals)) {
