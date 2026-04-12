@@ -2,7 +2,7 @@
   "name": "claudelike-bar",
   "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.7.5",
+  "version": "0.7.6",
   "publisher": "aes87",
   "repository": {
     "type": "git",
@@ -17,8 +17,25 @@
     "vscode": "^1.93.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "terminal",
+    "dashboard",
+    "sidebar",
+    "ai",
+    "status",
+    "multi-terminal",
+    "productivity"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "activationEvents": [
     "onStartupFinished"
   ],

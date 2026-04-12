@@ -1,5 +1,8 @@
 # claudelike-bar
 
+[![Open VSX Version](https://img.shields.io/open-vsx/v/aes87/claudelike-bar?label=Open%20VSX&color=1e1e2e)](https://open-vsx.org/extension/aes87/claudelike-bar)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **What would you do for a Claudelike Bar?**
 
 Probably open six terminals, lose track of which one needs input, miss the notification, and mass-`Ctrl+Tab` through all of them like a feral raccoon.
