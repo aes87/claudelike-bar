@@ -138,7 +138,7 @@ The "ignored" state only activates in passive-aggressive mode. Messages include 
 
 - *"Switch to passive-aggressive mode"*
 - *"Change the api terminal color to red"*
-- *"Auto-start life-planner when VS Code opens"*
+- *"Auto-start backend-api when VS Code opens"*
 - *"Give the backend terminal a nickname"*
 
 Claude will read `.claudelike-bar.jsonc`, make the change, and the extension picks it up immediately. No restart needed.
@@ -164,9 +164,9 @@ The file supports comments and is organized into sections:
   // Dragging a tile auto-flips this to "manual".
   "sortMode": "auto",
 
-  // Command sent into each auto-started terminal. Null to disable.
+  // Global command sent into auto-started terminals. Null to disable.
   // Per-terminal `command` below overrides this.
-  "claudeCommand": "claude --dangerously-skip-permissions",
+  "claudeCommand": null,
 
   // Turn on to trace hook events and state transitions to the
   // "Claudelike Bar" output channel + /tmp/claude-dashboard/debug.log
@@ -185,13 +185,18 @@ The file supports comments and is organized into sections:
   // └─────────────────────────────────────────────┘
 
   "terminals": {
-    "my-project": {
-      "color": "cyan",
-      "icon": "calendar",
-      "nickname": null,
+    "backend-api": {
+      "color": "yellow",
+      "icon": "server",
+      "nickname": "backend",
       "autoStart": true,
-      "command": "claude --dangerously-skip-permissions"
-      // "order" is set automatically when you drag tiles in the sidebar
+      "command": "cd ~/projects/backend-api && claude --dangerously-skip-permissions"
+    },
+    "frontend": {
+      "color": "magenta",
+      "icon": "paintcan",
+      "autoStart": true,
+      "command": "cd ~/projects/frontend && claude --dangerously-skip-permissions"
     }
   }
 }
@@ -205,7 +210,7 @@ The file supports comments and is organized into sections:
 | `icon` | string \| null | auto | Any [VS Code codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) name |
 | `nickname` | string \| null | `null` | Display name shown on tile instead of terminal name |
 | `autoStart` | boolean | `false` | Launch this terminal when VS Code starts |
-| `command` | string \| null | *inherits `claudeCommand`* | Command sent to the terminal when auto-started. Omit the field to inherit the global default; set to `null` to open the terminal without running anything. |
+| `command` | string \| null | *inherits `claudeCommand`* | Command sent to the terminal when auto-started. Use `"cd /path/to/project && claude"` to set the working directory. Omit the field to inherit the global default; set to `null` to open the terminal without running anything. |
 | `order` | number | *unset* | Manual sort position (set by drag-and-drop). Only used when top-level `sortMode` is `"manual"`. |
 
 Edit the file directly — changes take effect immediately. Claude Code can also read and modify it natively.

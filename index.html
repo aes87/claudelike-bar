@@ -426,7 +426,7 @@
           <div class="tile status-ignored" style="--tile-color: var(--vscode-terminal-ansiCyan)">
             <div class="tile-header">
               <span class="dot ignored"></span>
-              <span class="tile-name">life-planner</span>
+              <span class="tile-name">my-saas-app</span>
               <span class="tile-time">4m</span>
               <span class="tile-ctx ctx-warn">ctx 63%</span>
             </div>
@@ -436,7 +436,7 @@
           <div class="tile" style="--tile-color: var(--vscode-terminal-ansiYellow)">
             <div class="tile-header">
               <span class="dot waiting"></span>
-              <span class="tile-name">backend</span>
+              <span class="tile-name">backend-api</span>
               <span class="tile-time">12s</span>
               <span class="tile-ctx ctx-ok">ctx 22%</span>
             </div>
@@ -446,7 +446,7 @@
           <div class="tile active drop-after" style="--tile-color: var(--vscode-terminal-ansiMagenta)">
             <div class="tile-header">
               <span class="dot working"></span>
-              <span class="tile-name">web-design-pipeline</span>
+              <span class="tile-name">frontend</span>
               <span class="tile-time">now</span>
               <span class="tile-ctx ctx-ok">ctx 8%</span>
             </div>
@@ -456,7 +456,7 @@
           <div class="tile" style="--tile-color: var(--vscode-terminal-ansiRed)">
             <div class="tile-header">
               <span class="dot done"></span>
-              <span class="tile-name">ha-tools</span>
+              <span class="tile-name">data-pipeline</span>
               <span class="tile-time">28s</span>
               <span class="tile-ctx ctx-crit">ctx 84%</span>
             </div>
@@ -466,16 +466,16 @@
           <div class="tile" style="--tile-color: var(--vscode-terminal-ansiBrightBlue)">
             <div class="tile-header">
               <span class="dot idle"></span>
-              <span class="tile-name">obsidian-vault</span>
+              <span class="tile-name">docs</span>
               <span class="tile-ctx ctx-ok">ctx 15%</span>
             </div>
             <div class="tile-status">Idle</div>
           </div>
 
-          <div class="tile" style="--tile-color: var(--vscode-terminal-ansiCyan)">
+          <div class="tile" style="--tile-color: var(--vscode-terminal-ansiGreen)">
             <div class="tile-header">
               <span class="dot idle"></span>
-              <span class="tile-name">travel-planner</span>
+              <span class="tile-name">infra</span>
             </div>
             <div class="tile-status">Idle</div>
           </div>
@@ -498,13 +498,13 @@
 
       <div class="legend-section">
         <h3>Theme colors (left border)</h3>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiCyan)"></span> Cyan — life &amp; finance</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiGreen)"></span> Green — home &amp; IoT</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiBrightBlue)"></span> Blue — knowledge &amp; research</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiMagenta)"></span> Magenta — web &amp; design</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiYellow)"></span> Yellow — dev infrastructure</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiRed)"></span> Red — custom override</div>
-        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiBrightWhite)"></span> White — default / root</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiCyan)"></span> Cyan</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiGreen)"></span> Green</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiBrightBlue)"></span> Blue</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiMagenta)"></span> Magenta</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiYellow)"></span> Yellow</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiRed)"></span> Red</div>
+        <div class="legend-item"><span class="color-swatch" style="background:var(--vscode-terminal-ansiBrightWhite)"></span> White (default)</div>
       </div>
 
       <div class="legend-section">
@@ -566,17 +566,17 @@
         <div class="mini-tile" style="--tile-color: var(--vscode-terminal-ansiYellow)">
           <span class="grip">⋮⋮</span>
           <span class="dot waiting"></span>
-          backend
+          backend-api
         </div>
         <div class="mini-tile drop-target" style="--tile-color: var(--vscode-terminal-ansiCyan)">
           <span class="grip">⋮⋮</span>
           <span class="dot ignored"></span>
-          life-planner
+          my-saas-app
         </div>
         <div class="mini-tile dragging" style="--tile-color: var(--vscode-terminal-ansiMagenta)">
           <span class="grip">⋮⋮</span>
           <span class="dot working"></span>
-          web-design-pipeline
+          frontend
         </div>
       </div>
     </div>
@@ -593,7 +593,7 @@
 
     <div class="feature-card">
       <h3>Auto-start terminals <span class="badge">NEW</span></h3>
-      <p>Mark projects with <code>"autoStart": true</code> and they spin up automatically on window open. Each terminal can override the global <code>claudeCommand</code> with its own.</p>
+      <p>Mark projects with <code>"autoStart": true</code> and they spin up automatically on window open. Each terminal can have its own <code>"command"</code> to <code>cd</code> into the right directory and launch Claude.</p>
       <p style="margin-top: 0;">Pair with VS Code's <code>enablePersistentSessions</code> and your Claude processes survive window reloads — no context loss.</p>
     </div>
 
@@ -622,7 +622,7 @@
       <div class="turn">
         <div class="bubble user">
           <div class="who">You</div>
-          Switch to passive-aggressive mode and rename api to "backend".
+          Switch to passive-aggressive mode and rename backend-api to "backend".
         </div>
         <div class="bubble claude">
           <div class="who">Claude</div>
@@ -631,7 +631,7 @@
   <span class="add">"mode": "passive-aggressive",</span>
 
   "terminals": {
-    "api": {
+    "backend-api": {
       "color": "yellow",
       <span class="rem">"nickname": null,</span>
       <span class="add">"nickname": "backend",</span>
@@ -645,19 +645,20 @@
       <div class="turn">
         <div class="bubble user">
           <div class="who">You</div>
-          Auto-start my daily drivers: 3d-printing, api, life-planner, obsidian-vault. Run <code>claude --dangerously-skip-permissions</code> in each.
+          Auto-start backend-api, frontend, docs, and data-pipeline. Each should <code>cd</code> into its project directory and launch Claude.
         </div>
         <div class="bubble claude">
           <div class="who">Claude</div>
-          Four <code>"autoStart": true</code> flags set, and the global <code>claudeCommand</code>:
-          <div class="diff">  <span class="k">"claudeCommand"</span>: <span class="s">"claude --dangerously-skip-permissions"</span>,
-
-  <span class="k">"terminals"</span>: {
-    <span class="k">"3d-printing"</span>:    { <span class="k">"autoStart"</span>: <span class="b">true</span>, ... },
-    <span class="k">"api"</span>:            { <span class="k">"autoStart"</span>: <span class="b">true</span>, ... },
-    <span class="k">"life-planner"</span>:   { <span class="k">"autoStart"</span>: <span class="b">true</span>, ... },
-    <span class="k">"obsidian-vault"</span>: { <span class="k">"autoStart"</span>: <span class="b">true</span>, ... }
-  }</div>
+          Four terminals configured with per-terminal <code>command</code> overrides:
+          <div class="diff">  <span class="k">"backend-api"</span>: {
+    <span class="k">"autoStart"</span>: <span class="b">true</span>,
+    <span class="k">"command"</span>: <span class="s">"cd ~/projects/backend-api && claude"</span>
+  },
+  <span class="k">"frontend"</span>: {
+    <span class="k">"autoStart"</span>: <span class="b">true</span>,
+    <span class="k">"command"</span>: <span class="s">"cd ~/projects/frontend && claude"</span>
+  },
+  ...</div>
           Next time you open VS Code, all four launch and run Claude automatically.
         </div>
       </div>
@@ -665,15 +666,15 @@
       <div class="turn">
         <div class="bubble user">
           <div class="who">You</div>
-          Vault Direct needs a different startup command — it's my Telegram bridge.
+          The staging terminal needs different flags — it should run Claude with the MCP plugin.
         </div>
         <div class="bubble claude">
           <div class="who">Claude</div>
-          Added a per-terminal override. This one inherits nothing from <code>claudeCommand</code>:
-          <div class="diff">  <span class="k">"Vault Direct"</span>: {
-    <span class="k">"color"</span>: <span class="s">"blue"</span>,
+          Added a per-terminal <code>command</code> override:
+          <div class="diff">  <span class="k">"staging"</span>: {
+    <span class="k">"color"</span>: <span class="s">"magenta"</span>,
     <span class="k">"autoStart"</span>: <span class="b">true</span>,
-    <span class="k">"command"</span>: <span class="s">"claude --channels plugin:telegram@claude-plugins-official"</span>
+    <span class="k">"command"</span>: <span class="s">"cd ~/projects/staging && claude --mcp-config mcp.json"</span>
   }</div>
         </div>
       </div>
@@ -681,14 +682,14 @@
       <div class="turn">
         <div class="bubble user">
           <div class="who">You</div>
-          Something's weird — my life-planner tile is stuck on "Working" forever. Can you figure out what's wrong?
+          Something's weird — my frontend tile is stuck on "Working" forever. Can you figure out what's wrong?
         </div>
         <div class="bubble claude">
           <div class="who">Claude</div>
           Turning on debug logging:
           <div class="diff">  <span class="rem">"debug": false,</span>
   <span class="add">"debug": true,</span></div>
-          Open the <strong>Claudelike Bar</strong> output channel (<code>Ctrl+Shift+U</code>) and run a prompt in life-planner. I'll watch for hook events and state transitions — if the hook never fires or the project name doesn't match the tile, we'll see it in the trace.
+          Open the <strong>Claudelike Bar</strong> output channel (<code>Ctrl+Shift+U</code>) and run a prompt in frontend. I'll watch for hook events and state transitions — if the hook never fires or the project name doesn't match the tile, we'll see it in the trace.
         </div>
       </div>
 

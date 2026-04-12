@@ -1,7 +1,7 @@
 export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored';
 
 export interface TileData {
-  id: number; // stable numeric identity ��� used as DOM key and in webview messages
+  id: number; // stable numeric identity — used as DOM key and in webview messages
   name: string;
   displayName: string; // nickname from config, or same as name
   status: SessionStatus;
@@ -35,38 +35,11 @@ export interface StatusFileData {
 
 export type ThemeGroup = 'cyan' | 'green' | 'blue' | 'magenta' | 'yellow' | 'white';
 
-export const THEME_MAP: Record<string, ThemeGroup> = {
-  // Life & finance → cyan
-  'life-planner': 'cyan',
-  'financial-planner': 'cyan',
-  'travel-planner': 'cyan',
-  'health-dash': 'cyan',
-  'mortgage-viz': 'cyan',
-  // Home & IoT → green
-  'ha-tools': 'green',
-  'automated-martha-tek': 'green',
-  'garden-assist': 'green',
-  '3d-printing': 'green',
-  // Knowledge & research → blue
-  'obsidian-vault': 'blue',
-  'git-publishing': 'blue',
-  'research-workflows': 'blue',
-  'prompt-master': 'blue',
-  'media-recs': 'blue',
-  // Web & design → magenta
-  'web-design-pipeline': 'magenta',
-  'web-hosting': 'magenta',
-  'web-auto': 'magenta',
-  'strudel-noodle': 'magenta',
-  // Dev infrastructure → yellow
-  'api': 'yellow',
-  'secrets-manager': 'yellow',
-  'container-backup': 'yellow',
-  'scripts': 'yellow',
-  'vscode-enhancement': 'yellow',
-  // Root → white
-  'workspace': 'white',
-};
+// Fallback color hints for common project-name patterns.
+// The config file (.claudelike-bar.jsonc) overrides these — once a terminal
+// appears in the config its color is read from there, not this map.
+// Add entries here only for names likely to appear across many workspaces.
+export const THEME_MAP: Record<string, ThemeGroup> = {};
 
 // Use VS Code's terminal ANSI CSS variables so colors match terminal tab indicators exactly
 export const THEME_CSS_VARS: Record<ThemeGroup, string> = {
@@ -94,28 +67,6 @@ export function getThemeColor(projectName: string, override?: string): string {
   return THEME_CSS_VARS[getDefaultColor(projectName)];
 }
 
-export const ICON_MAP: Record<string, string> = {
-  '3d-printing': 'package',
-  'api': 'server',
-  'automated-martha-tek': 'beaker',
-  'container-backup': 'archive',
-  'financial-planner': 'graph',
-  'garden-assist': 'leaf',
-  'git-publishing': 'book',
-  'ha-tools': 'home',
-  'health-dash': 'heart',
-  'life-planner': 'calendar',
-  'media-recs': 'play',
-  'mortgage-viz': 'graph-line',
-  'obsidian-vault': 'notebook',
-  'prompt-master': 'wand',
-  'research-workflows': 'search',
-  'scripts': 'tools',
-  'strudel-noodle': 'flame',
-  'travel-planner': 'globe',
-  'secrets-manager': 'lock',
-  'vscode-enhancement': 'settings-gear',
-  'web-auto': 'robot',
-  'web-design-pipeline': 'paintcan',
-  'web-hosting': 'cloud',
-};
+// Fallback icon hints for common project-name patterns.
+// Same as THEME_MAP — the config file takes precedence once it exists.
+export const ICON_MAP: Record<string, string> = {};

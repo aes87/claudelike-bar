@@ -6,7 +6,7 @@
 # Project-name derivation (in priority order):
 #   1. $CLAUDELIKE_BAR_NAME env var — explicit override set by the extension
 #      when auto-starting a terminal. Required for terminals whose name doesn't
-#      match their directory (e.g. "Vault Direct" → /workspace/projects/obsidian-vault/vault).
+#      match their directory (e.g. "My Staging" → ~/projects/staging).
 #   2. /workspace/projects/<name>/... — walk up the cwd for the project root.
 #   3. /workspace itself → "workspace".
 #   4. basename of cwd (fallback).
