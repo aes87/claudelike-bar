@@ -154,7 +154,7 @@ export class ConfigManager implements vscode.Disposable {
   }
 
   getLabel(status: string): string {
-    return this.mergedLabels[status] ?? status;
+    return this.mergedLabels[status] || status;
   }
 
   getIgnoredTexts(): string[] {

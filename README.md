@@ -259,6 +259,9 @@ This requires `jq`. The base extension does not.
 - Open at least one named terminal — plain shell terminals named "bash"/"zsh"/"sh" are filtered out. Use a VS Code terminal profile or rename the terminal
 - If the extension failed to activate (check the log above), no terminals will ever appear — fix the activation error first
 
+**Debugging with the trace log**
+- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), and the hook script writes a trace to `/tmp/claude-dashboard/debug.log`.
+
 **Tiles stuck on "Working" — never show "Ready for input"**
 - The `dashboard-status.sh` hook must be registered on **all 4 events**: `PreToolUse`, `UserPromptSubmit`, `Stop`, and `Notification`. If Stop/Notification are missing, the bar never sees the "finished" signal
 - Re-run `./setup.sh` or `node scripts/merge-hooks.js` to add any missing events — both are idempotent
