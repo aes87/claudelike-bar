@@ -11,3 +11,6 @@ hooks/**
 *.vsix
 index.html
 package-lock.json
+test/**
+vitest.config.ts
+.github/**

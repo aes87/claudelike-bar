@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Package VSIX
+        run: npm run package
+
+  setup-script:
+    # Test setup.sh on Linux and macOS (bash-only)
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Smoke-test setup.sh
+        run: |
+          # setup.sh tries to install the extension via `code` CLI and merge
+          # hooks into ~/.claude/settings.json. We create the dirs it expects,
+          # then run it. The `code` CLI won't be available, but that's the
+          # handled fallback path.
+          mkdir -p ~/.claude/hooks
+          echo '{}' > ~/.claude/settings.json
+          chmod +x setup.sh
+          ./setup.sh
