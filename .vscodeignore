@@ -6,7 +6,8 @@ CLAUDE.md
 setup.sh
 node_modules/**
 .gitignore
-hooks/**
+hooks/*.legacy
+hooks/*.sh
 .git/**
 *.vsix
 index.html
@@ -14,3 +15,5 @@ package-lock.json
 test/**
 vitest.config.ts
 .github/**
+docs/sessions/**
+docs/launch-strategy.md

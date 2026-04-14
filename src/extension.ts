@@ -6,7 +6,10 @@ import { StatusWatcher } from './statusWatcher';
 import { ConfigManager } from './configManager';
 import { shSingleQuote } from './util';
 import { getStatusDir } from './statusDir';
+import { isSetupComplete, executeInstallCommand, showSetupNotification, HOOKS_DOC_URL } from './setup';
 import * as path from 'path';
+
+const SETUP_PROMPTED_KEY = 'claudelike-bar.setupPrompted';
 
 const STATUS_DIR = getStatusDir();
 const DEBUG_FLAG = path.join(STATUS_DIR, '.debug');
@@ -61,6 +64,29 @@ export function activate(context: vscode.ExtensionContext) {
       vscode.window.showTextDocument(vscode.Uri.file(configPath));
     },
   );
+
+  // Setup commands — install hooks and view docs
+  const installHooksCmd = vscode.commands.registerCommand(
+    'claudeDashboard.installHooks',
+    () => executeInstallCommand(context.extensionPath, (m) => log(m)),
+  );
+  const showHooksCmd = vscode.commands.registerCommand(
+    'claudeDashboard.showHooks',
+    () => vscode.env.openExternal(vscode.Uri.parse(HOOKS_DOC_URL)),
+  );
+
+  // First-activation onboarding: if hooks aren't installed AND we haven't
+  // prompted before, show the "Install hooks" notification. Gate on
+  // globalState so users who dismissed once aren't nagged on every reload.
+  // Set the flag only AFTER the notification promise resolves — if the
+  // notification fails to display (e.g., window unavailable), we want to
+  // try again next activation rather than silently silencing it forever.
+  if (!isSetupComplete() && !context.globalState.get<boolean>(SETUP_PROMPTED_KEY)) {
+    showSetupNotification(context.extensionPath, (m) => log(m)).then(
+      () => context.globalState.update(SETUP_PROMPTED_KEY, true),
+      (err) => log(`setup notification failed: ${err instanceof Error ? err.message : err}`),
+    );
+  }
 
   // Handle webview messages
   provider.onMessage = (message) => {
@@ -141,6 +167,8 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     registration,
     openConfigCmd,
+    installHooksCmd,
+    showHooksCmd,
     tracker,
     watcher,
     configManager,

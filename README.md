@@ -29,25 +29,29 @@ A VS Code sidebar that shows you — at a glance — what every Claude Code term
 
 - **VS Code** >= 1.93
 - **Claude Code** — the CLI, installed and working
-- **Node.js** — for building the extension (any recent version)
+- **Node.js** — bundled with Claude Code, no separate install needed
 
-That's it. No `jq`, no special tools.
+That's it. No `jq`, no bash, no special tools.
 
-### Point Claude at it
+### The fast path
 
-> *"Install this extension: https://github.com/aes87/claudelike-bar"*
+1. Install from [Open VSX](https://open-vsx.org/extension/aes87/claudelike-bar) — or any VS Code-compatible marketplace
+2. Open VS Code, you'll see a notification: **"Claudelike Bar needs to install a Claude Code hook..."**
+3. Click **Install hooks**. Done.
 
-That's it. Claude clones the repo, reads the setup instructions, and handles everything. Reload VS Code when it's done.
+The extension writes a small hook script to `~/.claude/hooks/dashboard-status.js` and registers 4 event handlers in `~/.claude/settings.json`. Tiles start updating on your next Claude turn. If you want to inspect what gets written first, click **Show me the hooks** on that notification — it opens [HOOKS.md](docs/HOOKS.md), which shows every file in full.
 
-### One-command setup
+You can also run the install manually any time: `Cmd+Shift+P` → **Claudelike Bar: Install Hooks**.
 
-Or run it yourself:
+### Prefer the command line?
+
+Clone the repo and run:
 
 ```bash
 ./setup.sh
 ```
 
-The setup script copies the hook script, registers hooks in `~/.claude/settings.json` (idempotent — safe to run twice), builds and installs the extension. Reload VS Code after setup — the octopus icon appears in the activity bar.
+Builds the extension, installs the VSIX, copies the hook script, and merges settings.json entries. Idempotent.
 
 ### Manual setup
 
