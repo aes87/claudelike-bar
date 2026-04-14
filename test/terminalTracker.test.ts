@@ -2,10 +2,12 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as vscode from 'vscode';
 import { __resetMock } from './__mocks__/vscode';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
-// ConfigManager reads from disk on construction — write a minimal config first
-const TEST_ROOT = '/tmp/test-workspace';
+// ConfigManager reads from disk on construction — write a minimal config first.
+// Use os.tmpdir() for cross-platform compatibility (not hardcoded /tmp).
+const TEST_ROOT = path.join(os.tmpdir(), 'test-workspace');
 const CONFIG_PATH = path.join(TEST_ROOT, '.claudelike-bar.jsonc');
 
 function writeConfig(config: Record<string, any> = { terminals: {} }) {
@@ -165,5 +167,116 @@ describe('TerminalTracker state machine', () => {
     tracker.updateStatus('nonexistent', 'working', 'PreToolUse');
     // Should not throw, and existing tile should be unchanged
     expect(getTile()?.status).toBe('idle');
+  });
+});
+
+describe('TerminalTracker name matching (3-tier)', () => {
+  let tracker: TerminalTracker;
+  let config: ConfigManager;
+
+  afterEach(() => {
+    tracker?.dispose();
+    config?.dispose();
+    cleanConfig();
+  });
+
+  it('matches via exact terminal name (Tier 1)', () => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    addMockTerminal('backend');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    tracker.updateStatus('backend', 'working', 'PreToolUse');
+    const tile = tracker.getTiles().find(t => t.name === 'backend');
+    expect(tile?.status).toBe('working');
+  });
+
+  it('matches via explicit projectName alias (Tier 2)', () => {
+    __resetMock();
+    writeConfig({
+      terminals: {
+        'VS Code Enhancement': {
+          color: 'yellow',
+          icon: null,
+          nickname: null,
+          autoStart: false,
+          projectName: 'vscode-enhancement',
+        },
+      },
+    });
+    addMockTerminal('VS Code Enhancement');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    tracker.updateStatus('vscode-enhancement', 'working', 'PreToolUse');
+    const tile = tracker.getTiles().find(t => t.name === 'VS Code Enhancement');
+    expect(tile?.status).toBe('working');
+  });
+
+  it('matches via normalized fallback (Tier 3)', () => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    addMockTerminal('VS Code Enhancement');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    tracker.updateStatus('vscode-enhancement', 'working', 'PreToolUse');
+    const tile = tracker.getTiles().find(t => t.name === 'VS Code Enhancement');
+    expect(tile?.status).toBe('working');
+  });
+
+  it('prefers exact match over normalized match when both possible', () => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    // Two terminals: one exact match, one that would normalize-match
+    addMockTerminal('myapi');
+    addMockTerminal('my-api');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    // Incoming project "my-api" — should match the tile literally named "my-api"
+    // (Tier 1, score 3) not "myapi" (Tier 3, score 1)
+    tracker.updateStatus('my-api', 'working', 'PreToolUse');
+    const exactTile = tracker.getTiles().find(t => t.name === 'my-api');
+    const normalizedTile = tracker.getTiles().find(t => t.name === 'myapi');
+    expect(exactTile?.status).toBe('working');
+    expect(normalizedTile?.status).toBe('idle');
+  });
+
+  it('skips normalized match when projectName is explicitly set but does not match', () => {
+    __resetMock();
+    writeConfig({
+      terminals: {
+        'my-project': {
+          color: 'cyan',
+          icon: null,
+          nickname: null,
+          autoStart: false,
+          projectName: 'explicitly-different',
+        },
+      },
+    });
+    addMockTerminal('my-project');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    // Status for "myproject" would normally Tier-3 match "my-project",
+    // but projectName is set to something else — user has opted out of fuzzy matching
+    tracker.updateStatus('myproject', 'working', 'PreToolUse');
+    const tile = tracker.getTiles().find(t => t.name === 'my-project');
+    expect(tile?.status).toBe('idle');
+  });
+
+  it('updateContext uses the same matching logic', () => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    addMockTerminal('VS Code Enhancement');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+
+    tracker.updateContext('vscode-enhancement', 55);
+    const tile = tracker.getTiles().find(t => t.name === 'VS Code Enhancement');
+    expect(tile?.contextPercent).toBe(55);
   });
 });

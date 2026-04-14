@@ -2,6 +2,10 @@
 // Only stubs what the source files actually call.
 
 import { vi } from 'vitest';
+import * as os from 'os';
+import * as path from 'path';
+
+const TEST_WORKSPACE = path.join(os.tmpdir(), 'test-workspace');
 
 export class EventEmitter {
   private listeners: Function[] = [];
@@ -21,7 +25,7 @@ class MockUri {
 export const Uri = MockUri;
 
 export const workspace = {
-  workspaceFolders: [{ uri: MockUri.file('/tmp/test-workspace'), name: 'test', index: 0 }],
+  workspaceFolders: [{ uri: MockUri.file(TEST_WORKSPACE), name: 'test', index: 0 }],
   createFileSystemWatcher: vi.fn(() => ({
     onDidChange: vi.fn(() => ({ dispose: vi.fn() })),
     onDidCreate: vi.fn(() => ({ dispose: vi.fn() })),

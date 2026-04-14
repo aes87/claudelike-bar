@@ -17,9 +17,11 @@ echo
 # 1. Hook script
 echo "[1/4] Installing hook script..."
 mkdir -p ~/.claude/hooks
-cp "$SCRIPT_DIR/hooks/dashboard-status.sh" ~/.claude/hooks/ || { echo "Error: failed to copy hook script" >&2; exit 1; }
-chmod +x ~/.claude/hooks/dashboard-status.sh
-echo "      Copied to ~/.claude/hooks/dashboard-status.sh"
+cp "$SCRIPT_DIR/hooks/dashboard-status.js" ~/.claude/hooks/ || { echo "Error: failed to copy hook script" >&2; exit 1; }
+chmod +x ~/.claude/hooks/dashboard-status.js
+# Clean up the legacy bash hook if it's still in place from a prior install
+rm -f ~/.claude/hooks/dashboard-status.sh
+echo "      Copied to ~/.claude/hooks/dashboard-status.js"
 
 # 2. Merge hooks into settings.json
 echo "[2/4] Configuring Claude Code hooks..."

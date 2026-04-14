@@ -1,5 +1,5 @@
 {
-  "// instructions": "Merge this into your ~/.claude/settings.json under the 'hooks' key. Adjust the path to dashboard-status.sh to match where you placed it.",
+  "// instructions": "Merge this into your ~/.claude/settings.json under the 'hooks' key. Adjust the path to dashboard-status.js to match where you placed it.",
 
   "hooks": {
     "PreToolUse": [
@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/dashboard-status.sh"
+            "command": "~/.claude/hooks/dashboard-status.js"
           }
         ]
       }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/dashboard-status.sh"
+            "command": "~/.claude/hooks/dashboard-status.js"
           }
         ]
       }
@@ -30,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/dashboard-status.sh"
+            "command": "~/.claude/hooks/dashboard-status.js"
           }
         ]
       }
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/dashboard-status.sh"
+            "command": "~/.claude/hooks/dashboard-status.js"
           }
         ]
       }

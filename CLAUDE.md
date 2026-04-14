@@ -10,9 +10,10 @@ Run `./setup.sh` — it handles everything (hook script, settings.json merge, bu
 
 ```
 Claude Code hooks (4 events: PreToolUse, UserPromptSubmit, Stop, Notification)
-    → ~/.claude/hooks/dashboard-status.sh
-    → writes JSON to /tmp/claude-dashboard/{project}.json
+    → ~/.claude/hooks/dashboard-status.js  (Node.js, zero deps)
+    → writes JSON to {os.tmpdir()}/claude-dashboard/{project}.json
     → VS Code FileSystemWatcher picks it up
+    → TerminalTracker matches project to tile (3-tier: exact / projectName alias / normalized)
     → sidebar tiles update
 ```
 
@@ -25,7 +26,8 @@ src/
   extension.ts          — activation, wiring
   configManager.ts      — reads/writes .claudelike-bar.jsonc (JSONC format)
   terminalTracker.ts    — terminal lifecycle + status state machine
-  statusWatcher.ts      — watches /tmp/claude-dashboard/*.json
+  statusWatcher.ts      — watches {os.tmpdir()}/claude-dashboard/*.json
+  statusDir.ts          — cross-platform status dir resolution (used by hook + extension)
   dashboardProvider.ts  — webview sidebar
   types.ts              — shared types, theme/icon maps
 media/
@@ -34,8 +36,9 @@ media/
   codicon.css/ttf       — icon font
   dashboard.svg         — activity bar icon
 hooks/
-  dashboard-status.sh   — hook script (copied to ~/.claude/hooks/ by setup)
-  settings-snippet.json — hook config for manual merge
+  dashboard-status.js       — Node.js hook script (copied to ~/.claude/hooks/ by setup)
+  dashboard-status.sh.legacy — retired bash hook, kept for reference
+  settings-snippet.json     — hook config for manual merge
 scripts/
   merge-hooks.js        — idempotent settings.json hook merger (ESM, no deps)
 ```
@@ -92,7 +95,7 @@ code --install-extension .../claudelike-bar-X.Y.Z.vsix --force
 After a container rebuild:
 - The VSIX gets reinstalled automatically (from the workspace-mounted file)
 - `~/.claude/settings.json` lives on a Docker volume — hooks persist across rebuilds
-- `~/.claude/hooks/dashboard-status.sh` also lives on the volume — persists
+- `~/.claude/hooks/dashboard-status.js` also lives on the volume — persists
 - `.claudelike-bar.jsonc` is in the workspace root — persists
 
 If the bar breaks after a rebuild, check activation errors first (see Verify section).
@@ -108,10 +111,10 @@ grep -A2 "claudelike-bar" ~/.vscode-server/data/logs/*/exthost*/remoteexthost.lo
 grep dashboard-status ~/.claude/settings.json
 
 # Hook script in place?
-ls -la ~/.claude/hooks/dashboard-status.sh
+ls -la ~/.claude/hooks/dashboard-status.js
 
-# Status files being written?
-cat /tmp/claude-dashboard/*.json
+# Status files being written? (cross-platform temp dir)
+ls "$(node -e 'console.log(require(\"os\").tmpdir())')/claude-dashboard/"
 ```
 
 If the extension host log shows `Cannot find module './impl/format'`, rebuild with `npm run build && npm run package` and reinstall — the `--main-fields` flag fixes it.

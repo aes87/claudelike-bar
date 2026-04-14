@@ -64,21 +64,23 @@ code --install-extension claudelike-bar-*.vsix --force
 **2. Copy the hook script**
 
 ```bash
-cp hooks/dashboard-status.sh ~/.claude/hooks/
-chmod +x ~/.claude/hooks/dashboard-status.sh
+cp hooks/dashboard-status.js ~/.claude/hooks/
+chmod +x ~/.claude/hooks/dashboard-status.js
 ```
 
 **3. Register hooks**
 
 Add these to `~/.claude/settings.json` under the `"hooks"` key. If you already have hooks for these events, add the dashboard entry alongside your existing ones — don't replace them.
 
+On Windows, prefix the command with `node` so it doesn't depend on shebang interpretation: `"node \"C:/Users/you/.claude/hooks/dashboard-status.js\""`. The `setup.sh` / `merge-hooks.js` flow handles this automatically.
+
 ```json
 {
   "hooks": {
-    "PreToolUse": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.sh" }] }],
-    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.sh" }] }],
-    "Stop": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.sh" }] }],
-    "Notification": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.sh" }] }]
+    "PreToolUse": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Stop": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Notification": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }]
   }
 }
 ```
@@ -115,7 +117,7 @@ Claude will read `.claudelike-bar.jsonc`, ask what projects you care about, set 
 ```
 Claude Code hooks fire on events
          ↓
-dashboard-status.sh writes JSON → /tmp/claude-dashboard/{project}.json
+dashboard-status.js writes JSON → {os.tmpdir()}/claude-dashboard/{project}.json
          ↓
 VS Code FileSystemWatcher picks it up
          ↓
@@ -172,7 +174,7 @@ The file supports comments and is organized into sections:
   "claudeCommand": null,
 
   // Turn on to trace hook events and state transitions to the
-  // "Claudelike Bar" output channel + /tmp/claude-dashboard/debug.log
+  // "Claudelike Bar" output channel + {os.tmpdir()}/claude-dashboard/debug.log
   "debug": false,
 
   // ┌─────────────────────────────────────────────┐
@@ -229,22 +231,22 @@ You can drag tiles in either mode — dragging automatically flips `sortMode` to
 
 ### Context % (Optional Enhancement)
 
-If you use a Claude Code statusline script, add this to feed context window usage into the tiles:
+If you use a Claude Code statusline script, add this Node.js snippet to feed context window usage into the tiles. Zero extra dependencies — Node is already installed for Claude Code:
 
-```bash
-DIR=$(echo "$input" | jq -r '.workspace.current_dir // "?"' | xargs basename)
-PCT=$(echo "$input" | jq -r '.context_window.used_percentage // 0' | cut -d. -f1)
-
-mkdir -p /tmp/claude-dashboard
-DASH_FILE="/tmp/claude-dashboard/${DIR}.json"
-if [ -f "$DASH_FILE" ]; then
-  echo "$(jq -c --argjson cp "$PCT" '.context_percent = $cp' "$DASH_FILE")" > "$DASH_FILE"
-else
-  echo "{\"project\":\"$DIR\",\"timestamp\":$(date +%s),\"context_percent\":$PCT}" > "$DASH_FILE"
-fi
+```javascript
+#!/usr/bin/env node
+const fs = require('fs'), os = require('os'), path = require('path');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const project = path.basename(input.workspace?.current_dir || '?');
+const pct = Math.floor(input.context_window?.used_percentage || 0);
+const dir = path.join(os.tmpdir(), 'claude-dashboard');
+fs.mkdirSync(dir, { recursive: true });
+const file = path.join(dir, `${project}.json`);
+let data = { project, timestamp: Math.floor(Date.now() / 1000) };
+try { data = { ...data, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
+data.context_percent = pct;
+fs.writeFileSync(file, JSON.stringify(data));
 ```
-
-This requires `jq`. The base extension does not.
 
 ## Troubleshooting
 
@@ -263,18 +265,18 @@ This requires `jq`. The base extension does not.
 - If the extension failed to activate (check the log above), no terminals will ever appear — fix the activation error first
 
 **Debugging with the trace log**
-- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), and the hook script writes a trace to `/tmp/claude-dashboard/debug.log`.
+- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), and the hook script writes a trace to `{os.tmpdir()}/claude-dashboard/debug.log`.
 
 **Tiles stuck on "Working" — never show "Ready for input"**
-- The `dashboard-status.sh` hook must be registered on **all 4 events**: `PreToolUse`, `UserPromptSubmit`, `Stop`, and `Notification`. If Stop/Notification are missing, the bar never sees the "finished" signal
+- The `dashboard-status.js` hook must be registered on **all 4 events**: `PreToolUse`, `UserPromptSubmit`, `Stop`, and `Notification`. If Stop/Notification are missing, the bar never sees the "finished" signal
 - Re-run `./setup.sh` or `node scripts/merge-hooks.js` to add any missing events — both are idempotent
 - Verify: `grep dashboard-status ~/.claude/settings.json` should show the hook under all 4 events
 
 **Tiles appear but never update status**
 - Check hooks are registered: `grep dashboard-status ~/.claude/settings.json`
-- Check the hook script exists and is executable: `ls -la ~/.claude/hooks/dashboard-status.sh`
-- Check status files are being written: `cat /tmp/claude-dashboard/*.json`
-- If nothing in `/tmp/claude-dashboard/`, the hooks aren't firing — verify Claude Code is running
+- Check the hook script exists and is executable: `ls -la ~/.claude/hooks/dashboard-status.js`
+- Check status files are being written: `ls "$(node -e 'console.log(require(\"os\").tmpdir())')/claude-dashboard/"`
+- If nothing there, the hooks aren't firing — verify Claude Code is running
 
 **Extension not showing in activity bar**
 - Make sure you installed the `.vsix`, not just cloned the repo

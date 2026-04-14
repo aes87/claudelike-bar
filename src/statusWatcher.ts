@@ -2,8 +2,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { StatusFileData } from './types';
+import { getStatusDir } from './statusDir';
 
-const STATUS_DIR = '/tmp/claude-dashboard';
+const STATUS_DIR = getStatusDir();
 
 export class StatusWatcher implements vscode.Disposable {
   private watcher: vscode.FileSystemWatcher | undefined;

@@ -11,6 +11,14 @@ export interface TerminalConfig {
   autoStart: boolean;
   command?: string | null;
   order?: number;
+  /**
+   * Project name used by the hook script (e.g. "vscode-enhancement") when the
+   * terminal's VS Code display name differs (e.g. "VS Code Enhancement").
+   * Used to match status file writes to the correct tile.
+   * Leave unset to match on terminal name directly, or rely on the
+   * normalized fallback (lowercase, stripped whitespace/hyphens).
+   */
+  projectName?: string | null;
 }
 
 export interface ContextThresholds {
@@ -391,6 +399,9 @@ export class ConfigManager implements vscode.Disposable {
       '  // nickname:  display name override (null = use terminal name)',
       '  // autoStart: true = open this terminal when VS Code starts',
       '  // command:   override the global claudeCommand for this terminal (omit to inherit)',
+      '  // projectName: hook project name that maps to this terminal — set this',
+      '  //            when the terminal display name differs from the hook cwd',
+      '  //            (e.g. "VS Code Enhancement" terminal, project "vscode-enhancement")',
       `  "terminals": ${indent(JSON.stringify(terminals, null, 4), 2)}`,
       '}',
       '',

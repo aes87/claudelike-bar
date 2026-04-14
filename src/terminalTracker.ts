@@ -210,12 +210,54 @@ export class TerminalTracker implements vscode.Disposable {
     this.onChangeEmitter.fire();
   }
 
+  /**
+   * Score how strongly a tile matches an incoming project name. Higher is better.
+   *   3 — exact match on terminal name
+   *   2 — explicit `projectName` alias in config
+   *   1 — normalized match (lowercase, stripped whitespace/hyphens/underscores)
+   *   0 — no match
+   * Tier 3 (normalized) catches common cases like "VS Code Enhancement" vs
+   * "vscode-enhancement" without requiring config, but is skipped when the
+   * tile has an explicit `projectName` alias — that's the user's signal that
+   * they've handled disambiguation themselves.
+   */
+  private matchScore(tile: TileData, projectName: string): number {
+    if (tile.name === projectName) return 3;
+    const cfg = this.configManager.getTerminal(tile.name);
+    if (cfg?.projectName && cfg.projectName === projectName) return 2;
+    if (cfg?.projectName) return 0; // explicit alias set but didn't match — opt out of normalized
+    if (this.normalizeForMatch(tile.name) === this.normalizeForMatch(projectName)) return 1;
+    return 0;
+  }
+
+  /**
+   * Find the single best-matching tile for a given project name, preferring
+   * exact matches over alias matches over normalized matches. Returns undefined
+   * if no tile matches at any tier.
+   */
+  private findMatchingTile(projectName: string): TileData | undefined {
+    let best: TileData | undefined;
+    let bestScore = 0;
+    for (const [, tile] of this.terminals) {
+      const score = this.matchScore(tile, projectName);
+      if (score > bestScore) {
+        best = tile;
+        bestScore = score;
+        if (score === 3) break; // exact match — can't do better
+      }
+    }
+    return best;
+  }
+
+  private normalizeForMatch(name: string): string {
+    return name.toLowerCase().replace(/[-_\s]+/g, '');
+  }
+
   updateStatus(projectName: string, status: SessionStatus, event?: string, contextPercent?: number): void {
     let matched = false;
-    for (const [, tile] of this.terminals) {
-      if (tile.name !== projectName) continue;
+    const tile = this.findMatchingTile(projectName);
+    if (tile) {
       matched = true;
-
       const prev = tile.status;
       let changed = false;
 
@@ -266,7 +308,6 @@ export class TerminalTracker implements vscode.Disposable {
       if (contextPercent !== undefined) {
         tile.contextPercent = contextPercent;
       }
-      break; // terminal names are unique
     }
     if (!matched) {
       // Lazy — the join() only runs when debug is actually on.
@@ -339,14 +380,11 @@ export class TerminalTracker implements vscode.Disposable {
   }
 
   updateContext(projectName: string, contextPercent: number): void {
-    let changed = false;
-    for (const [, tile] of this.terminals) {
-      if (tile.name === projectName) {
-        tile.contextPercent = contextPercent;
-        changed = true;
-      }
+    const tile = this.findMatchingTile(projectName);
+    if (tile) {
+      tile.contextPercent = contextPercent;
+      this.onChangeEmitter.fire();
     }
-    if (changed) this.onChangeEmitter.fire();
   }
 
   getTiles(): TileData[] {

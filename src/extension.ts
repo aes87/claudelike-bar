@@ -5,9 +5,11 @@ import { TerminalTracker } from './terminalTracker';
 import { StatusWatcher } from './statusWatcher';
 import { ConfigManager } from './configManager';
 import { shSingleQuote } from './util';
+import { getStatusDir } from './statusDir';
+import * as path from 'path';
 
-const STATUS_DIR = '/tmp/claude-dashboard';
-const DEBUG_FLAG = `${STATUS_DIR}/.debug`;
+const STATUS_DIR = getStatusDir();
+const DEBUG_FLAG = path.join(STATUS_DIR, '.debug');
 const AUTO_START_REVIVE_GRACE_MS = 1200;
 
 type LogFn = (msg: string | (() => string)) => void;
