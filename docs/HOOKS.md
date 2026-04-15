@@ -6,122 +6,44 @@ Everything the extension writes outside your workspace, shown in full. If you do
 
 Two things, both under `~/.claude/`:
 
-1. **A hook script** at `~/.claude/hooks/dashboard-status.js` (Node.js, ~100 lines, zero dependencies)
-2. **Four hook registrations** added to `~/.claude/settings.json` so Claude Code invokes the script on events
+1. **A hook script** at `~/.claude/hooks/dashboard-status.js` (Node.js, ~130 lines, zero dependencies)
+2. **Eight hook registrations** added to `~/.claude/settings.json` so Claude Code invokes the script on state-relevant events
 
 That's it. No daemon, no background process, no network activity.
 
 ## Why hooks?
 
-Claude Code fires [hook events](https://docs.anthropic.com/en/docs/claude-code/hooks) at specific moments in its lifecycle. The extension needs to know when Claude is working vs waiting for input, so it registers for these four:
+Claude Code fires [hook events](https://code.claude.com/docs/en/hooks) at specific moments in its lifecycle. The extension needs to know when Claude is working, waiting, erroring, or coordinating with a subagent/teammate. As of v0.9 it registers for these eight:
 
-| Event | When it fires | What the hook writes |
+| Event | When it fires | Status signal |
 |-------|---------------|----------------------|
-| `PreToolUse` | Before Claude runs any tool (file edit, bash command, etc.) | `status: "working"` |
-| `UserPromptSubmit` | When you submit a prompt | `status: "working"` |
-| `Stop` | When Claude finishes its turn | `status: "ready"` |
-| `Notification` | When Claude needs input (permission, clarification) | `status: "ready"` |
+| `PreToolUse` | Before Claude runs any tool (file edit, bash command, etc.) | `working` |
+| `UserPromptSubmit` | When you submit a prompt | `working` (universal reset) |
+| `Stop` | When Claude finishes its turn | `ready` (or held if subagent/teammate in flight) |
+| `Notification` | When Claude needs input (permission, clarification, MCP) | `ready` with refined label by matcher |
+| `StopFailure` | API error (rate limit, auth, billing, server) | `error` — sticky, cleared on retry |
+| `SubagentStart` | A Task-tool subagent was spawned | increments pending-subagent counter |
+| `SubagentStop` | A Task-tool subagent finished | decrements pending-subagent counter |
+| `TeammateIdle` | An Agent Teams teammate is waiting on a peer | sets teammate-idle flag |
 
-Each event triggers `dashboard-status.js`, which writes a small JSON file that the sidebar watches.
+Each event triggers `dashboard-status.js`, which writes a small JSON file that the sidebar watches. The extension's state machine interprets the raw signal — for example, a `Stop` event is suppressed when the pending-subagent counter is non-zero, so the tile doesn't falsely transition to "ready" while a Task subagent is still running.
 
 ## The hook script (in full)
 
 Located at `~/.claude/hooks/dashboard-status.js`. This is the entire file — nothing hidden:
 
-```javascript
-#!/usr/bin/env node
-/**
- * Claudelike Bar — Claude Code hook script (Node.js).
- *
- * Reads the hook payload from stdin (JSON), derives the project name, and
- * writes a status file that the VS Code extension watches.
- *
- * Handles all 4 hook events: PreToolUse, UserPromptSubmit, Stop, Notification.
- *   Stop/Notification → "ready"
- *   PreToolUse/UserPromptSubmit → "working"
- *
- * Zero npm dependencies — uses only Node.js built-ins.
- */
+See [`hooks/dashboard-status.js`](https://github.com/aes87/claudelike-bar/blob/main/hooks/dashboard-status.js) on GitHub for the current source — it's the same file the extension ships. The script is ~130 lines, zero dependencies, Node.js built-ins only.
 
-'use strict';
-
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-function main() {
-  const statusDir = process.env.CLAUDELIKE_STATUS_DIR
-    || path.join(os.tmpdir(), 'claude-dashboard');
-
-  fs.mkdirSync(statusDir, { recursive: true });
-
-  // Read stdin — Claude Code pipes JSON. If stdin is a TTY, skip parsing.
-  let input = '';
-  try {
-    if (!process.stdin.isTTY) {
-      input = fs.readFileSync(0, 'utf8');
-    }
-  } catch {
-    // No stdin available — proceed with empty input, will fall back.
-  }
-
-  let event = '';
-  let cwd = '';
-  if (input) {
-    try {
-      const parsed = JSON.parse(input);
-      event = typeof parsed.hook_event_name === 'string' ? parsed.hook_event_name : '';
-      cwd = typeof parsed.cwd === 'string' ? parsed.cwd : '';
-    } catch {
-      // Malformed JSON — leave event/cwd empty, fall back below.
-    }
-  }
-
-  if (!cwd) cwd = process.cwd();
-
-  // Derive project name
-  let project = process.env.CLAUDELIKE_BAR_NAME || '';
-  if (!project) {
-    project = path.basename(cwd);
-  }
-
-  // Sanitize project name — strip anything that could break the filename.
-  project = project
-    .replace(/[\r\n]/g, '')
-    .replace(/[\/\\:*?"<>|]/g, '_')
-    .replace(/^\.+|\.+$/g, '');
-  if (!project) project = 'unknown';
-
-  const status = (event === 'Stop' || event === 'Notification') ? 'ready' : 'working';
-  const timestamp = Math.floor(Date.now() / 1000);
-
-  const payload = { project, status, timestamp, event };
-  const outPath = path.join(statusDir, `${project}.json`);
-  const tmpPath = `${outPath}.tmp.${process.pid}`;
-
-  // Atomic write via rename — prevents partial-JSON reads by the watcher.
-  try {
-    fs.writeFileSync(tmpPath, JSON.stringify(payload) + '\n');
-    fs.renameSync(tmpPath, outPath);
-  } catch (err) {
-    try { fs.unlinkSync(tmpPath); } catch {}
-  }
-}
-
-try {
-  main();
-} catch {
-  // Any uncaught error is swallowed — the hook must never fail Claude's execution.
-}
-
-process.exit(0);
-```
-
-**Reading this:**
-- Reads JSON from stdin (Claude Code pipes the hook payload in)
-- Writes a small file like `{os.tmpdir()}/claude-dashboard/my-project.json`
-- Uses atomic write (rename from temp file) to avoid partial reads
-- Never throws — a failing hook must never fail Claude
+**What it does:**
+- Reads the Claude Code hook JSON payload from stdin
+- Extracts `hook_event_name`, `cwd`, and (when present) `tool_name`, `agent_type`, `error_type`, `notification_type`
+- Maps the event to a raw status signal (`working`, `ready`, `error`, `subagent_start`, `subagent_stop`, or `teammate_idle`)
+- Derives the project name from `$CLAUDELIKE_BAR_NAME` env var or `basename(cwd)`
+- Sanitizes the project name (strips POSIX path separators and Windows-reserved chars)
+- Read-merge-writes the status file so the statusline's `context_percent` survives
+- Writes atomically via `rename` — no partial-JSON reads by the extension's watcher
+- Never throws — a failing hook must never fail Claude's execution
+- Optional debug trace log when `<STATUS_DIR>/.debug` file is present
 
 ## The status file
 
@@ -132,51 +54,32 @@ Example contents (`~/Library/Caches/.../claude-dashboard/my-project.json` on mac
   "project": "my-project",
   "status": "working",
   "timestamp": 1776125339,
-  "event": "PreToolUse"
+  "event": "PreToolUse",
+  "tool_name": "Bash",              // optional, from PreToolUse/PostToolUse
+  "agent_type": "Explore",          // optional, from SubagentStart/SubagentStop
+  "error_type": "rate_limit",       // optional, from StopFailure matchers
+  "notification_type": "permission_prompt", // optional, from Notification matchers
+  "context_percent": 42             // optional, written by the statusline (not the hook)
 }
 ```
 
-Four fields. No session content, no prompt text, no tool inputs — just the state machine input for the sidebar.
+Only `project`, `status`, `timestamp`, and `event` are always present. The rest are written opportunistically based on what the specific hook event carried. No session content, no prompt text, no tool inputs — just the state machine input for the sidebar.
 
 ## The settings.json entries
 
-Added to `~/.claude/settings.json` under the `hooks` key. Four entries, one per event:
+Added to `~/.claude/settings.json` under the `hooks` key. One entry per registered event (8 as of v0.9):
 
 ```json
 {
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }
-        ]
-      }
-    ],
-    "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }
-        ]
-      }
-    ]
+    "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "StopFailure":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SubagentStart":    [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SubagentStop":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "TeammateIdle":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }]
   }
 }
 ```
@@ -192,7 +95,7 @@ The extension's merge logic is idempotent: if you re-run the setup command, it d
 - No prompt text, session content, tool inputs, or file contents
 - No user identity, no credentials, nothing from `~/.claude/auth`
 
-The extension uses VS Code's standard file-watcher API to detect when a status file changes, reads the 4-field JSON, and updates a tile in the sidebar. That's the entire data flow.
+The extension uses VS Code's standard file-watcher API to detect when a status file changes, reads the JSON, and updates a tile in the sidebar. That's the entire data flow.
 
 ## Removing it
 
@@ -202,7 +105,7 @@ Uninstall the extension from VS Code, then:
 rm ~/.claude/hooks/dashboard-status.js
 ```
 
-Remove the 4 dashboard-status entries from `~/.claude/settings.json` manually (or via the "Claudelike Bar: Uninstall Hooks" command if we ship one in a future version).
+Remove all dashboard-status entries from `~/.claude/settings.json` manually (or via the "Claudelike Bar: Uninstall Hooks" command if we ship one in a future version).
 
 ## Statusline (optional)
 

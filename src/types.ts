@@ -1,4 +1,20 @@
-export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored';
+export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored' | 'error';
+
+/**
+ * Raw status signals written by the hook script (not internal tile states).
+ * The extension's state machine maps these to `SessionStatus`.
+ *
+ * - `working` | `ready` | `error` — direct state signals
+ * - `subagent_start` | `subagent_stop` — counter updates, no state change
+ * - `teammate_idle` — flag update, no state change
+ */
+export type HookStatusSignal =
+  | 'working'
+  | 'ready'
+  | 'error'
+  | 'subagent_start'
+  | 'subagent_stop'
+  | 'teammate_idle';
 
 export interface TileData {
   id: number; // stable numeric identity — used as DOM key and in webview messages
@@ -15,6 +31,10 @@ export interface TileData {
   contextWarn: number; // threshold for yellow
   contextCrit: number; // threshold for red
   ignoredText?: string;
+  // v0.9 — multi-agent state tracking
+  pendingSubagents?: number;  // count of in-flight Task-tool subagents
+  teammateIdle?: boolean;     // Agent Teams teammate waiting for peer
+  errorType?: string;         // e.g. "rate_limit", "authentication_failed"
 }
 
 export type WebviewMessage =
@@ -27,10 +47,15 @@ export type WebviewMessage =
 
 export interface StatusFileData {
   project: string;
-  status: SessionStatus;
+  status: HookStatusSignal | SessionStatus;
   timestamp: number;
   event: string;
   context_percent?: number;
+  // v0.9 — additional hook payload fields, optional
+  tool_name?: string;          // PreToolUse/PostToolUse
+  agent_type?: string;         // SubagentStart/SubagentStop
+  error_type?: string;         // StopFailure matchers
+  notification_type?: string;  // Notification matchers
 }
 
 export type ThemeGroup = 'cyan' | 'green' | 'blue' | 'magenta' | 'yellow' | 'white';

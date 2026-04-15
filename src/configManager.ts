@@ -50,6 +50,9 @@ const DEFAULT_LABELS: Record<string, string> = {
   ready: 'Ready for input',
   waiting: 'Waiting...',
   done: 'Done',
+  // v0.9 — richer state awareness
+  error: 'Error',
+  teammate_idle: 'Waiting for teammate',
 };
 
 const DEFAULT_IGNORED_TEXTS = [
@@ -377,7 +380,7 @@ export class ConfigManager implements vscode.Disposable {
       '  // \u2514\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2518',
       '',
       '  // Status labels \u2014 customize the text shown for each terminal state.',
-      '  // Keys: idle, working, ready, waiting, done',
+      '  // Keys: idle, working, ready, waiting, done, error, teammate_idle',
       `  "labels": ${indent(JSON.stringify(labels, null, 4), 2)},`,
       '',
       '  // Context window usage thresholds (percentage of Claude\'s context used).',

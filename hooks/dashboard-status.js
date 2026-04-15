@@ -5,9 +5,17 @@
  * Reads the hook payload from stdin (JSON), derives the project name, and
  * writes a status file that the VS Code extension watches.
  *
- * Handles all 4 hook events: PreToolUse, UserPromptSubmit, Stop, Notification.
- *   Stop/Notification → "ready"
- *   PreToolUse/UserPromptSubmit → "working"
+ * Handles all configured hook events and emits a raw status signal into
+ * the status file. The extension's state machine interprets the signals;
+ * this script is intentionally dumb about state transitions.
+ *
+ * Event → status signal mapping (see body for authoritative logic):
+ *   Stop, Notification              → "ready"
+ *   StopFailure                     → "error"
+ *   SubagentStart / SubagentStop    → "subagent_start" / "subagent_stop"
+ *   TeammateIdle                    → "teammate_idle"
+ *   PreToolUse, UserPromptSubmit,
+ *   everything else                 → "working"
  *
  * Project-name priority:
  *   1. $CLAUDELIKE_BAR_NAME env var — explicit override set by the extension
@@ -49,11 +57,20 @@ function main() {
 
   let event = '';
   let cwd = '';
+  let toolName = '';
+  let agentType = '';
+  let errorType = '';
+  let notificationType = '';
   if (input) {
     try {
       const parsed = JSON.parse(input);
       event = typeof parsed.hook_event_name === 'string' ? parsed.hook_event_name : '';
       cwd = typeof parsed.cwd === 'string' ? parsed.cwd : '';
+      // Tool/subagent/error/notification metadata — event-specific, may be absent.
+      toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : '';
+      agentType = typeof parsed.agent_type === 'string' ? parsed.agent_type : '';
+      errorType = typeof parsed.error_type === 'string' ? parsed.error_type : '';
+      notificationType = typeof parsed.notification_type === 'string' ? parsed.notification_type : '';
     } catch {
       // Malformed JSON — leave event/cwd empty, fall back below.
     }
@@ -77,7 +94,20 @@ function main() {
     .replace(/^\.+|\.+$/g, '');
   if (!project) project = 'unknown';
 
-  const status = (event === 'Stop' || event === 'Notification') ? 'ready' : 'working';
+  // Status resolution — the hook writes the raw state signal, the extension's
+  // state machine decides what transition (if any) to apply.
+  //   Stop/Notification     → ready (extension may override if subagent pending)
+  //   StopFailure           → error (new in v0.9)
+  //   SubagentStart         → subagent_start (extension increments counter)
+  //   SubagentStop          → subagent_stop (extension decrements counter)
+  //   TeammateIdle          → teammate_idle (extension sets flag)
+  //   Everything else       → working
+  let status = 'working';
+  if (event === 'Stop' || event === 'Notification') status = 'ready';
+  else if (event === 'StopFailure') status = 'error';
+  else if (event === 'SubagentStart') status = 'subagent_start';
+  else if (event === 'SubagentStop') status = 'subagent_stop';
+  else if (event === 'TeammateIdle') status = 'teammate_idle';
   const timestamp = Math.floor(Date.now() / 1000);
 
   const outPath = path.join(statusDir, `${project}.json`);
@@ -88,12 +118,20 @@ function main() {
   // we'd wipe context_percent on every hook fire (4+ per Claude turn). Read
   // the existing file first, merge our fields in, preserve whatever the
   // statusline left behind.
-  let payload = { project, status, timestamp, event };
+  const ownFields = { project, status, timestamp, event };
+  // Optional fields — only include when we actually have a value. Keeps the
+  // JSON clean and avoids clobbering prior values with empty strings.
+  if (toolName) ownFields.tool_name = toolName;
+  if (agentType) ownFields.agent_type = agentType;
+  if (errorType) ownFields.error_type = errorType;
+  if (notificationType) ownFields.notification_type = notificationType;
+
+  let payload = ownFields;
   try {
     const existing = JSON.parse(fs.readFileSync(outPath, 'utf8'));
     // Existing fields we don't own (like context_percent) carry through;
-    // fields we do own (status, timestamp, event) are overwritten.
-    payload = Object.assign({}, existing, payload);
+    // fields we do own (status, timestamp, event, …) are overwritten.
+    payload = Object.assign({}, existing, ownFields);
   } catch {
     // No existing file or malformed — write fresh.
   }
@@ -117,6 +155,8 @@ function main() {
     const line = `[${new Date().toISOString()}] event=${JSON.stringify(event)} `
       + `status=${JSON.stringify(status)} project=${JSON.stringify(project)} `
       + `cwd=${JSON.stringify(cwd)} env_name=${JSON.stringify(process.env.CLAUDELIKE_BAR_NAME || '')} `
+      + `tool=${JSON.stringify(toolName)} agent=${JSON.stringify(agentType)} `
+      + `err=${JSON.stringify(errorType)} notif=${JSON.stringify(notificationType)} `
       + `stdin_bytes=${input.length}\n`;
     try {
       fs.appendFileSync(path.join(statusDir, 'debug.log'), line);

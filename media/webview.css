@@ -173,6 +173,22 @@ body {
   animation: ignored-pulse 3s ease-in-out infinite;
 }
 
+/* v0.9 — error state (StopFailure events). Solid red, no animation —
+   distinct from ignored (dashed, pulsing) so at a glance you can tell
+   "Claude crashed" from "you ignored me". */
+.dot.error {
+  background: var(--vscode-terminal-ansiRed);
+}
+
+.tile.status-error {
+  border-left-color: var(--vscode-terminal-ansiRed) !important;
+}
+
+.tile-status.status-error {
+  color: var(--vscode-terminal-ansiRed);
+  font-weight: 600;
+}
+
 /* Ignored tile gets dashed border to visually separate from done */
 .tile.status-ignored {
   border-left-style: dashed;

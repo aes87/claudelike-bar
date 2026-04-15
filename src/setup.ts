@@ -4,7 +4,16 @@ import * as path from 'path';
 import { claudeDir, hooksDir, settingsPath, writeSettingsAtomic } from './claudePaths';
 
 const HOOK_FILENAME = 'dashboard-status.js';
-const HOOK_EVENTS = ['PreToolUse', 'UserPromptSubmit', 'Stop', 'Notification'];
+const HOOK_EVENTS = [
+  'PreToolUse',
+  'UserPromptSubmit',
+  'Stop',
+  'Notification',
+  'StopFailure',      // v0.9: API errors (rate limit, auth, billing)
+  'SubagentStart',    // v0.9: Task-tool subagent spawned
+  'SubagentStop',     // v0.9: Task-tool subagent finished
+  'TeammateIdle',     // v0.9: Agent Teams — teammate waiting for peer
+];
 
 const HOOKS_DOC_URL = 'https://github.com/aes87/claudelike-bar/blob/main/docs/HOOKS.md';
 
@@ -30,7 +39,7 @@ function isCurrentDashboardHook(cmd: unknown): boolean {
 }
 
 /**
- * Check whether the hook script file exists and all 4 events are registered
+ * Check whether the hook script file exists and all HOOK_EVENTS are registered
  * in settings.json pointing at the CURRENT (.js) hook. Legacy .sh-only
  * registrations return false so the migration path runs on next activation.
  */
@@ -59,7 +68,7 @@ export function isSetupComplete(): boolean {
 
 /**
  * Copy the hook script from the extension's bundled `hooks/` dir to
- * `~/.claude/hooks/`, then merge the 4 hook event registrations into
+ * `~/.claude/hooks/`, then merge all HOOK_EVENTS registrations into
  * `~/.claude/settings.json`. Idempotent — safe to run multiple times.
  * Also migrates any legacy `.sh` references to the new `.js` command.
  */

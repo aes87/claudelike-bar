@@ -107,8 +107,9 @@ function patchTile(el, tile) {
   // Active state
   el.classList.toggle('active', tile.isActive);
 
-  // Ignored tile class (for dashed border)
+  // Status-specific tile classes (for dashed border, error color, etc.)
   el.classList.toggle('status-ignored', tile.status === 'ignored');
+  el.classList.toggle('status-error', tile.status === 'error');
 
   // Theme color
   el.style.setProperty('--tile-color', tile.themeColor);
@@ -184,7 +185,10 @@ function patchTile(el, tile) {
   if (statusEl) {
     const label = tile.statusLabel || tile.status;
     statusEl.textContent = label;
-    statusEl.className = `tile-status${tile.status === 'ignored' ? ' status-ignored' : ''}`;
+    const statusClass = tile.status === 'ignored' ? ' status-ignored'
+      : tile.status === 'error' ? ' status-error'
+      : '';
+    statusEl.className = `tile-status${statusClass}`;
   }
 
   // Aria
@@ -198,7 +202,10 @@ function patchTile(el, tile) {
  */
 function createTileEl(tile, index) {
   const el = document.createElement('div');
-  el.className = `tile entering${tile.isActive ? ' active' : ''}${tile.status === 'ignored' ? ' status-ignored' : ''}`;
+  const tileStatusClass = tile.status === 'ignored' ? ' status-ignored'
+    : tile.status === 'error' ? ' status-error'
+    : '';
+  el.className = `tile entering${tile.isActive ? ' active' : ''}${tileStatusClass}`;
   el.style.setProperty('--tile-color', tile.themeColor);
   el.tabIndex = 0;
   el.dataset.id = String(tile.id);
@@ -228,7 +235,7 @@ function createTileEl(tile, index) {
       ${tile.status !== 'idle' ? `<span class="tile-time">${timeStr}</span>` : '<span class="tile-time"></span>'}
       ${ctxHtml}
     </div>
-    <div class="tile-status${tile.status === 'ignored' ? ' status-ignored' : ''}">${escapeHtml(statusLabel)}</div>
+    <div class="tile-status${tile.status === 'ignored' ? ' status-ignored' : tile.status === 'error' ? ' status-error' : ''}">${escapeHtml(statusLabel)}</div>
   `;
 
   el.setAttribute('aria-label', `${displayName} — ${statusLabel}`);

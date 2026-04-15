@@ -33,9 +33,11 @@ describe('setup module', () => {
     fs.rmSync(extensionPath, { recursive: true, force: true });
   });
 
-  it('installs hook and registers all 4 events in fresh environment', async () => {
+  it('installs hook and registers all hook events in fresh environment', async () => {
     const result = await runSetup(extensionPath);
-    expect(result.added).toBe(4);
+    // v0.9: 8 events — PreToolUse, UserPromptSubmit, Stop, Notification,
+    // StopFailure, SubagentStart, SubagentStop, TeammateIdle
+    expect(result.added).toBe(8);
     expect(result.migrated).toBe(0);
 
     const hookPath = path.join(fakeHome, '.claude', 'hooks', 'dashboard-status.js');
@@ -44,7 +46,11 @@ describe('setup module', () => {
     const settings = JSON.parse(
       fs.readFileSync(path.join(fakeHome, '.claude', 'settings.json'), 'utf8'),
     );
-    for (const event of ['PreToolUse', 'UserPromptSubmit', 'Stop', 'Notification']) {
+    const allEvents = [
+      'PreToolUse', 'UserPromptSubmit', 'Stop', 'Notification',
+      'StopFailure', 'SubagentStart', 'SubagentStop', 'TeammateIdle',
+    ];
+    for (const event of allEvents) {
       expect(Array.isArray(settings.hooks[event])).toBe(true);
       const hasDashboardHook = settings.hooks[event].some(
         (e: any) => e.hooks?.some((h: any) => h.command?.includes('dashboard-status.js')),

@@ -143,7 +143,7 @@ export function activate(context: vscode.ExtensionContext) {
   watcher.onStatusChange((data) => {
     log(() => `status-file project=${data.project} status=${data.status ?? '-'} event=${data.event ?? '-'} ctx=${data.context_percent ?? '-'}`);
     if (data.status) {
-      tracker.updateStatus(data.project, data.status, data.event, data.context_percent);
+      tracker.updateStatus(data.project, data.status, data.event, data.context_percent, data);
     } else if (data.context_percent !== undefined) {
       tracker.updateContext(data.project, data.context_percent);
     }
