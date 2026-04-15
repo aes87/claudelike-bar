@@ -53,6 +53,10 @@ const DEFAULT_LABELS: Record<string, string> = {
   // v0.9 — richer state awareness
   error: 'Error',
   teammate_idle: 'Waiting for teammate',
+  // v0.9.1 — lifecycle + transient flags
+  offline: 'Offline',
+  compacting: 'Compacting context…',
+  tool_error: 'Working (tool error)',
 };
 
 const DEFAULT_IGNORED_TEXTS = [

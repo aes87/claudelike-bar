@@ -9,10 +9,15 @@ const HOOK_EVENTS = [
   'UserPromptSubmit',
   'Stop',
   'Notification',
-  'StopFailure',      // v0.9: API errors (rate limit, auth, billing)
-  'SubagentStart',    // v0.9: Task-tool subagent spawned
-  'SubagentStop',     // v0.9: Task-tool subagent finished
-  'TeammateIdle',     // v0.9: Agent Teams — teammate waiting for peer
+  'StopFailure',         // v0.9: API errors (rate limit, auth, billing)
+  'SubagentStart',       // v0.9: Task-tool subagent spawned
+  'SubagentStop',        // v0.9: Task-tool subagent finished
+  'TeammateIdle',        // v0.9: Agent Teams — teammate waiting for peer
+  'SessionStart',        // v0.9.1: Claude session begins/resumes
+  'SessionEnd',          // v0.9.1: Claude session terminates
+  'PostToolUseFailure',  // v0.9.1: tool execution error
+  'PreCompact',          // v0.9.1: context compaction starting
+  'PostCompact',         // v0.9.1: context compaction finished
 ];
 
 const HOOKS_DOC_URL = 'https://github.com/aes87/claudelike-bar/blob/main/docs/HOOKS.md';

@@ -1,4 +1,4 @@
-export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored' | 'error';
+export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 'ignored' | 'error' | 'offline';
 
 /**
  * Raw status signals written by the hook script (not internal tile states).
@@ -7,6 +7,9 @@ export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 
  * - `working` | `ready` | `error` — direct state signals
  * - `subagent_start` | `subagent_stop` — counter updates, no state change
  * - `teammate_idle` — flag update, no state change
+ * - `session_start` | `session_end` — lifecycle signals (v0.9.1)
+ * - `tool_failure` — transient flag (v0.9.1)
+ * - `compact_start` | `compact_end` — label override (v0.9.1)
  */
 export type HookStatusSignal =
   | 'working'
@@ -14,7 +17,12 @@ export type HookStatusSignal =
   | 'error'
   | 'subagent_start'
   | 'subagent_stop'
-  | 'teammate_idle';
+  | 'teammate_idle'
+  | 'session_start'
+  | 'session_end'
+  | 'tool_failure'
+  | 'compact_start'
+  | 'compact_end';
 
 export interface TileData {
   id: number; // stable numeric identity — used as DOM key and in webview messages
@@ -35,6 +43,9 @@ export interface TileData {
   pendingSubagents?: number;  // count of in-flight Task-tool subagents
   teammateIdle?: boolean;     // Agent Teams teammate waiting for peer
   errorType?: string;         // e.g. "rate_limit", "authentication_failed"
+  // v0.9.1 — transient flags (don't affect SessionStatus directly)
+  toolError?: boolean;        // PostToolUseFailure fired; cleared on next Stop
+  compacting?: boolean;       // PreCompact received, no matching PostCompact yet
 }
 
 export type WebviewMessage =
@@ -56,6 +67,10 @@ export interface StatusFileData {
   agent_type?: string;         // SubagentStart/SubagentStop
   error_type?: string;         // StopFailure matchers
   notification_type?: string;  // Notification matchers
+  // v0.9.1 — session / compaction metadata
+  source?: string;             // SessionStart matcher (startup/resume/clear/compact)
+  reason?: string;             // SessionEnd matcher (logout/prompt_input_exit/...)
+  compaction_trigger?: string; // PreCompact/PostCompact matcher (manual/auto)
 }
 
 export type ThemeGroup = 'cyan' | 'green' | 'blue' | 'magenta' | 'yellow' | 'white';

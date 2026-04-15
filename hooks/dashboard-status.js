@@ -14,6 +14,11 @@
  *   StopFailure                     → "error"
  *   SubagentStart / SubagentStop    → "subagent_start" / "subagent_stop"
  *   TeammateIdle                    → "teammate_idle"
+ *   SessionStart                    → "session_start"          (v0.9.1)
+ *   SessionEnd                      → "session_end"            (v0.9.1)
+ *   PostToolUseFailure              → "tool_failure"           (v0.9.1)
+ *   PreCompact                      → "compact_start"          (v0.9.1)
+ *   PostCompact                     → "compact_end"            (v0.9.1)
  *   PreToolUse, UserPromptSubmit,
  *   everything else                 → "working"
  *
@@ -61,6 +66,9 @@ function main() {
   let agentType = '';
   let errorType = '';
   let notificationType = '';
+  let sessionSource = '';      // v0.9.1: SessionStart matcher
+  let sessionEndReason = '';   // v0.9.1: SessionEnd matcher
+  let compactionTrigger = '';  // v0.9.1: PreCompact/PostCompact matcher
   if (input) {
     try {
       const parsed = JSON.parse(input);
@@ -71,6 +79,10 @@ function main() {
       agentType = typeof parsed.agent_type === 'string' ? parsed.agent_type : '';
       errorType = typeof parsed.error_type === 'string' ? parsed.error_type : '';
       notificationType = typeof parsed.notification_type === 'string' ? parsed.notification_type : '';
+      // v0.9.1 — session/compaction metadata.
+      sessionSource = typeof parsed.source === 'string' ? parsed.source : '';
+      sessionEndReason = typeof parsed.reason === 'string' ? parsed.reason : '';
+      compactionTrigger = typeof parsed.compaction_trigger === 'string' ? parsed.compaction_trigger : '';
     } catch {
       // Malformed JSON — leave event/cwd empty, fall back below.
     }
@@ -97,10 +109,15 @@ function main() {
   // Status resolution — the hook writes the raw state signal, the extension's
   // state machine decides what transition (if any) to apply.
   //   Stop/Notification     → ready (extension may override if subagent pending)
-  //   StopFailure           → error (new in v0.9)
+  //   StopFailure           → error (v0.9)
   //   SubagentStart         → subagent_start (extension increments counter)
   //   SubagentStop          → subagent_stop (extension decrements counter)
   //   TeammateIdle          → teammate_idle (extension sets flag)
+  //   SessionStart          → session_start (v0.9.1 — clear offline state)
+  //   SessionEnd            → session_end (v0.9.1 — set offline if matcher says so)
+  //   PostToolUseFailure    → tool_failure (v0.9.1 — transient flag)
+  //   PreCompact            → compact_start (v0.9.1 — label override)
+  //   PostCompact           → compact_end (v0.9.1 — clear override)
   //   Everything else       → working
   let status = 'working';
   if (event === 'Stop' || event === 'Notification') status = 'ready';
@@ -108,6 +125,11 @@ function main() {
   else if (event === 'SubagentStart') status = 'subagent_start';
   else if (event === 'SubagentStop') status = 'subagent_stop';
   else if (event === 'TeammateIdle') status = 'teammate_idle';
+  else if (event === 'SessionStart') status = 'session_start';
+  else if (event === 'SessionEnd') status = 'session_end';
+  else if (event === 'PostToolUseFailure') status = 'tool_failure';
+  else if (event === 'PreCompact') status = 'compact_start';
+  else if (event === 'PostCompact') status = 'compact_end';
   const timestamp = Math.floor(Date.now() / 1000);
 
   const outPath = path.join(statusDir, `${project}.json`);
@@ -125,6 +147,10 @@ function main() {
   if (agentType) ownFields.agent_type = agentType;
   if (errorType) ownFields.error_type = errorType;
   if (notificationType) ownFields.notification_type = notificationType;
+  // v0.9.1 — session/compaction metadata.
+  if (sessionSource) ownFields.source = sessionSource;
+  if (sessionEndReason) ownFields.reason = sessionEndReason;
+  if (compactionTrigger) ownFields.compaction_trigger = compactionTrigger;
 
   let payload = ownFields;
   try {
@@ -157,6 +183,8 @@ function main() {
       + `cwd=${JSON.stringify(cwd)} env_name=${JSON.stringify(process.env.CLAUDELIKE_BAR_NAME || '')} `
       + `tool=${JSON.stringify(toolName)} agent=${JSON.stringify(agentType)} `
       + `err=${JSON.stringify(errorType)} notif=${JSON.stringify(notificationType)} `
+      + `src=${JSON.stringify(sessionSource)} end_reason=${JSON.stringify(sessionEndReason)} `
+      + `compact=${JSON.stringify(compactionTrigger)} `
       + `stdin_bytes=${input.length}\n`;
     try {
       fs.appendFileSync(path.join(statusDir, 'debug.log'), line);

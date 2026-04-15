@@ -110,6 +110,7 @@ function patchTile(el, tile) {
   // Status-specific tile classes (for dashed border, error color, etc.)
   el.classList.toggle('status-ignored', tile.status === 'ignored');
   el.classList.toggle('status-error', tile.status === 'error');
+  el.classList.toggle('status-offline', tile.status === 'offline');
 
   // Theme color
   el.style.setProperty('--tile-color', tile.themeColor);
@@ -204,6 +205,7 @@ function createTileEl(tile, index) {
   const el = document.createElement('div');
   const tileStatusClass = tile.status === 'ignored' ? ' status-ignored'
     : tile.status === 'error' ? ' status-error'
+    : tile.status === 'offline' ? ' status-offline'
     : '';
   el.className = `tile entering${tile.isActive ? ' active' : ''}${tileStatusClass}`;
   el.style.setProperty('--tile-color', tile.themeColor);

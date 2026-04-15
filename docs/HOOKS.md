@@ -6,14 +6,14 @@ Everything the extension writes outside your workspace, shown in full. If you do
 
 Two things, both under `~/.claude/`:
 
-1. **A hook script** at `~/.claude/hooks/dashboard-status.js` (Node.js, ~130 lines, zero dependencies)
-2. **Eight hook registrations** added to `~/.claude/settings.json` so Claude Code invokes the script on state-relevant events
+1. **A hook script** at `~/.claude/hooks/dashboard-status.js` (Node.js, ~140 lines, zero dependencies)
+2. **Thirteen hook registrations** added to `~/.claude/settings.json` so Claude Code invokes the script on state-relevant events
 
 That's it. No daemon, no background process, no network activity.
 
 ## Why hooks?
 
-Claude Code fires [hook events](https://code.claude.com/docs/en/hooks) at specific moments in its lifecycle. The extension needs to know when Claude is working, waiting, erroring, or coordinating with a subagent/teammate. As of v0.9 it registers for these eight:
+Claude Code fires [hook events](https://code.claude.com/docs/en/hooks) at specific moments in its lifecycle. The extension needs to know when Claude is working, waiting, erroring, or coordinating with a subagent/teammate. As of v0.9.1 it registers for these thirteen:
 
 | Event | When it fires | Status signal |
 |-------|---------------|----------------------|
@@ -25,6 +25,11 @@ Claude Code fires [hook events](https://code.claude.com/docs/en/hooks) at specif
 | `SubagentStart` | A Task-tool subagent was spawned | increments pending-subagent counter |
 | `SubagentStop` | A Task-tool subagent finished | decrements pending-subagent counter |
 | `TeammateIdle` | An Agent Teams teammate is waiting on a peer | sets teammate-idle flag |
+| `SessionStart` | A Claude session begins or resumes | restores an `offline` tile to `idle` |
+| `SessionEnd` | A Claude session terminates (logout/exit/etc.) | transitions to `offline` — dimmed tile |
+| `PostToolUseFailure` | A tool execution fails | transient `tool_error` flag, cleared on next success |
+| `PreCompact` | Context compaction is starting | overrides label to "Compacting context…" |
+| `PostCompact` | Context compaction finished | clears the compacting override |
 
 Each event triggers `dashboard-status.js`, which writes a small JSON file that the sidebar watches. The extension's state machine interprets the raw signal — for example, a `Stop` event is suppressed when the pending-subagent counter is non-zero, so the tile doesn't falsely transition to "ready" while a Task subagent is still running.
 
@@ -59,6 +64,9 @@ Example contents (`~/Library/Caches/.../claude-dashboard/my-project.json` on mac
   "agent_type": "Explore",          // optional, from SubagentStart/SubagentStop
   "error_type": "rate_limit",       // optional, from StopFailure matchers
   "notification_type": "permission_prompt", // optional, from Notification matchers
+  "source": "startup",              // optional, from SessionStart matchers (v0.9.1)
+  "reason": "logout",               // optional, from SessionEnd matchers (v0.9.1)
+  "compaction_trigger": "auto",     // optional, from PreCompact/PostCompact (v0.9.1)
   "context_percent": 42             // optional, written by the statusline (not the hook)
 }
 ```
@@ -67,19 +75,24 @@ Only `project`, `status`, `timestamp`, and `event` are always present. The rest 
 
 ## The settings.json entries
 
-Added to `~/.claude/settings.json` under the `hooks` key. One entry per registered event (8 as of v0.9):
+Added to `~/.claude/settings.json` under the `hooks` key. One entry per registered event (13 as of v0.9.1):
 
 ```json
 {
   "hooks": {
-    "PreToolUse":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "UserPromptSubmit": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "Stop":             [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "Notification":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "StopFailure":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "SubagentStart":    [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "SubagentStop":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
-    "TeammateIdle":     [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }]
+    "PreToolUse":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "UserPromptSubmit":   [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Stop":               [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "Notification":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "StopFailure":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SubagentStart":      [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SubagentStop":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "TeammateIdle":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SessionStart":       [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "SessionEnd":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "PostToolUseFailure": [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "PreCompact":         [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }],
+    "PostCompact":        [{ "matcher": "", "hooks": [{ "type": "command", "command": "~/.claude/hooks/dashboard-status.js" }] }]
   }
 }
 ```

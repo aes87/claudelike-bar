@@ -51,8 +51,9 @@ body {
   background: var(--vscode-list-activeSelectionBackground);
 }
 
-/* Drag and drop */
-.tile.dragging {
+/* Drag and drop — `.tile.dragging.dragging` doubles specificity so dragging
+   always wins over status-specific opacity rules (e.g. .tile.status-offline). */
+.tile.dragging.dragging {
   opacity: 0.4;
   cursor: grabbing;
 }
@@ -165,6 +166,17 @@ body {
 .dot.done {
   background: var(--vscode-terminal-ansiCyan);
   opacity: 0.5;
+}
+
+/* v0.9.1 — offline state (SessionEnd with terminal matcher).
+   Grey dot, dimmed tile — Claude isn't running in this terminal. */
+.dot.offline {
+  background: var(--vscode-descriptionForeground);
+  opacity: 0.4;
+}
+
+.tile.status-offline {
+  opacity: 0.55;
 }
 
 .dot.ignored {

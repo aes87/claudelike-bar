@@ -509,3 +509,270 @@ describe('TerminalTracker v0.9 — multi-agent state', () => {
     }
   });
 });
+
+// -----------------------------------------------------------------
+// v0.9.1 state machine — offline, tool_failure, compacting
+// -----------------------------------------------------------------
+
+describe('TerminalTracker v0.9.1 — session / tool-failure / compaction', () => {
+  let tracker: TerminalTracker;
+  let config: ConfigManager;
+
+  beforeEach(() => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    addMockTerminal('my-project');
+    config = new ConfigManager();
+    tracker = new TerminalTracker(config);
+  });
+
+  afterEach(() => {
+    tracker.dispose();
+    config.dispose();
+    cleanConfig();
+  });
+
+  function getTile() {
+    return tracker.getTiles().find(t => t.name === 'my-project');
+  }
+
+  // --- SessionEnd → offline ---
+
+  it('session_end with logout reason transitions tile to offline', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('session_end with prompt_input_exit reason transitions tile to offline', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'prompt_input_exit' });
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('session_end clears all v0.9/v0.9.1 transient flags', () => {
+    tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+    tracker.updateStatus('my-project', 'teammate_idle', 'TeammateIdle');
+    tracker.updateStatus('my-project', 'error', 'StopFailure', undefined, { error_type: 'rate_limit' });
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    const tile = getTile()!;
+    expect(tile.status).toBe('offline');
+    expect(tile.pendingSubagents).toBe(0);
+    expect(tile.teammateIdle).toBe(false);
+    expect(tile.errorType).toBeUndefined();
+    expect(tile.toolError).toBe(false);
+    expect(tile.compacting).toBe(false);
+  });
+
+  it('session_end respects done stickiness', () => {
+    tracker.markDone(getTile()!.id);
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    expect(getTile()?.status).toBe('done'); // still done, not overridden
+  });
+
+  // --- SessionStart → restore from offline ---
+
+  it('session_start restores offline tile to idle', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    expect(getTile()?.status).toBe('offline');
+    tracker.updateStatus('my-project', 'session_start', 'SessionStart', undefined, { source: 'startup' });
+    expect(getTile()?.status).toBe('idle');
+  });
+
+  it('session_start is a no-op when tile is not offline', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'session_start', 'SessionStart', undefined, { source: 'resume' });
+    expect(getTile()?.status).toBe('working'); // unchanged
+  });
+
+  // --- sort order ---
+
+  it('offline sorts below idle (not urgent)', () => {
+    __resetMock();
+    writeConfig({ terminals: {} });
+    addMockTerminal('idle-proj');
+    addMockTerminal('offline-proj');
+    const c = new ConfigManager();
+    const t = new TerminalTracker(c);
+    try {
+      t.updateStatus('offline-proj', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+      // idle-proj stays idle
+      const tiles = t.getTiles();
+      const idlePos = tiles.findIndex(x => x.name === 'idle-proj');
+      const offlinePos = tiles.findIndex(x => x.name === 'offline-proj');
+      expect(idlePos).toBeLessThan(offlinePos);
+    } finally {
+      t.dispose();
+      c.dispose();
+    }
+  });
+
+  // --- PostToolUseFailure → tool_error flag ---
+
+  it('tool_failure sets toolError flag and updates label', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure', undefined, { tool_name: 'Bash' });
+    const tile = getTile()!;
+    expect(tile.toolError).toBe(true);
+    expect(tile.statusLabel).toContain('tool error');
+  });
+
+  it('tool_failure respects done stickiness', () => {
+    tracker.markDone(getTile()!.id);
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    expect(getTile()?.toolError).toBe(false); // guard blocked the flag
+    expect(getTile()?.status).toBe('done');
+  });
+
+  it('tool_failure respects error stickiness', () => {
+    tracker.updateStatus('my-project', 'error', 'StopFailure', undefined, { error_type: 'rate_limit' });
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    expect(getTile()?.toolError).toBe(false);
+    expect(getTile()?.status).toBe('error');
+  });
+
+  it('next PreToolUse clears toolError flag', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    expect(getTile()?.toolError).toBe(true);
+    tracker.updateStatus('my-project', 'working', 'PreToolUse');
+    expect(getTile()?.toolError).toBe(false);
+  });
+
+  it('Stop clears toolError flag at end of turn', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    tracker.updateStatus('my-project', 'ready', 'Stop');
+    expect(getTile()?.toolError).toBe(false);
+    expect(getTile()?.status).toBe('ready');
+  });
+
+  // --- PreCompact / PostCompact ---
+
+  it('compact_start overrides label with "Compacting..."', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact', undefined, { compaction_trigger: 'auto' });
+    const tile = getTile()!;
+    expect(tile.compacting).toBe(true);
+    expect(tile.statusLabel).toContain('Compacting');
+  });
+
+  it('compact_end clears compacting flag and restores working label', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    tracker.updateStatus('my-project', 'compact_end', 'PostCompact');
+    const tile = getTile()!;
+    expect(tile.compacting).toBe(false);
+    expect(tile.statusLabel).not.toContain('Compacting');
+  });
+
+  it('compact_end clears flag even when status has moved away from working', () => {
+    // Worst-case ordering: compact_start → Stop (before compact_end) →
+    // compact_end arrives too late. Flag should still clear.
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    tracker.updateStatus('my-project', 'ready', 'Stop');
+    // Stop should also have cleared compacting as end-of-turn
+    expect(getTile()?.compacting).toBe(false);
+    // Now late compact_end arrives — no-op since already cleared
+    tracker.updateStatus('my-project', 'compact_end', 'PostCompact');
+    expect(getTile()?.compacting).toBe(false);
+  });
+
+  it('PreToolUse clears stale compacting flag', () => {
+    // compact_start fires but compact_end never does; next PreToolUse
+    // should clear the stale flag (real activity means compaction is done).
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    expect(getTile()?.compacting).toBe(true);
+    tracker.updateStatus('my-project', 'working', 'PreToolUse');
+    expect(getTile()?.compacting).toBe(false);
+  });
+
+  it('UserPromptSubmit clears all v0.9.1 flags', () => {
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    const tile = getTile()!;
+    expect(tile.toolError).toBe(false);
+    expect(tile.compacting).toBe(false);
+  });
+
+  it('markDone clears all v0.9.1 flags', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    tracker.markDone(getTile()!.id);
+    const tile = getTile()!;
+    expect(tile.toolError).toBe(false);
+    expect(tile.compacting).toBe(false);
+    expect(tile.status).toBe('done');
+  });
+
+  // --- offline stickiness (hook events arriving after SessionEnd) ---
+
+  it('subagent_start does NOT resurrect an offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    expect(getTile()?.status).toBe('offline');
+    tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+    expect(getTile()?.status).toBe('offline'); // stays offline
+  });
+
+  it('teammate_idle does NOT resurrect an offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'teammate_idle', 'TeammateIdle');
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('StopFailure does NOT override an offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'error', 'StopFailure', undefined, { error_type: 'rate_limit' });
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('Stop does NOT override an offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'ready', 'Stop');
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('PreToolUse does NOT resurrect an offline tile — only SessionStart does', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'working', 'PreToolUse');
+    expect(getTile()?.status).toBe('offline');
+  });
+
+  it('tool_failure does not set flag on offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    expect(getTile()?.toolError).toBe(false);
+  });
+
+  it('compact_start does not set flag on offline tile', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    expect(getTile()?.compacting).toBe(false);
+  });
+
+  it('UserPromptSubmit is the escape hatch from offline', () => {
+    tracker.updateStatus('my-project', 'session_end', 'SessionEnd', undefined, { reason: 'logout' });
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    // UserPromptSubmit is universal reset — brings offline back to working
+    expect(getTile()?.status).toBe('working');
+  });
+
+  // --- tool_failure and compact_start only activate in valid states ---
+
+  it('tool_failure does not set flag on ready tile (no visible effect possible)', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'ready', 'Stop');
+    tracker.updateStatus('my-project', 'tool_failure', 'PostToolUseFailure');
+    expect(getTile()?.toolError).toBe(false); // status isn't working, no set
+  });
+
+  it('compact_start does not set flag on ready tile', () => {
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'ready', 'Stop');
+    tracker.updateStatus('my-project', 'compact_start', 'PreCompact');
+    expect(getTile()?.compacting).toBe(false);
+  });
+});

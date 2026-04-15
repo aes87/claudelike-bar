@@ -35,9 +35,9 @@ describe('setup module', () => {
 
   it('installs hook and registers all hook events in fresh environment', async () => {
     const result = await runSetup(extensionPath);
-    // v0.9: 8 events — PreToolUse, UserPromptSubmit, Stop, Notification,
-    // StopFailure, SubagentStart, SubagentStop, TeammateIdle
-    expect(result.added).toBe(8);
+    // v0.9.1: 13 events — v0.9's 8 plus SessionStart, SessionEnd,
+    // PostToolUseFailure, PreCompact, PostCompact.
+    expect(result.added).toBe(13);
     expect(result.migrated).toBe(0);
 
     const hookPath = path.join(fakeHome, '.claude', 'hooks', 'dashboard-status.js');
@@ -49,6 +49,7 @@ describe('setup module', () => {
     const allEvents = [
       'PreToolUse', 'UserPromptSubmit', 'Stop', 'Notification',
       'StopFailure', 'SubagentStart', 'SubagentStop', 'TeammateIdle',
+      'SessionStart', 'SessionEnd', 'PostToolUseFailure', 'PreCompact', 'PostCompact',
     ];
     for (const event of allEvents) {
       expect(Array.isArray(settings.hooks[event])).toBe(true);

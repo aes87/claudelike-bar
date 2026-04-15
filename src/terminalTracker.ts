@@ -75,6 +75,8 @@ export class TerminalTracker implements vscode.Disposable {
       contextCrit: thresholds.crit,
       pendingSubagents: 0,
       teammateIdle: false,
+      toolError: false,
+      compacting: false,
     });
   }
 
@@ -115,6 +117,8 @@ export class TerminalTracker implements vscode.Disposable {
         tile.pendingSubagents = 0;
         tile.teammateIdle = false;
         tile.errorType = undefined;
+        tile.toolError = false;
+        tile.compacting = false;
         this.clearReadyTimer(tile.id);
       }
       this.focusedWaitingTile = null;
@@ -210,14 +214,18 @@ export class TerminalTracker implements vscode.Disposable {
       tile.icon = cfg?.icon ?? ICON_MAP[tile.name] ?? null;
       tile.contextWarn = thresholds.warn;
       tile.contextCrit = thresholds.crit;
-      // Refresh status label — recompose v0.9 rich labels from current flags.
-      // Skip `ignored` (uses custom passive-aggressive text).
+      // Refresh status label — recompose v0.9 / v0.9.1 rich labels from
+      // current flags. Skip `ignored` (uses custom passive-aggressive text).
       if (tile.status === 'ignored') {
         // keep tile.statusLabel as-is (random ignored text)
       } else if (tile.status === 'error') {
         tile.statusLabel = this.errorLabel(tile.errorType);
+      } else if (tile.status === 'working' && tile.compacting) {
+        tile.statusLabel = this.configManager.getLabel('compacting');
       } else if (tile.status === 'working' && tile.teammateIdle) {
         tile.statusLabel = this.configManager.getLabel('teammate_idle');
+      } else if (tile.status === 'working' && tile.toolError) {
+        tile.statusLabel = this.configManager.getLabel('tool_error');
       } else if (tile.status === 'working') {
         tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
       } else {
@@ -315,7 +323,15 @@ export class TerminalTracker implements vscode.Disposable {
     status: SessionStatus | HookStatusSignal,
     event?: string,
     contextPercent?: number,
-    extra?: { tool_name?: string; agent_type?: string; error_type?: string; notification_type?: string },
+    extra?: {
+      tool_name?: string;
+      agent_type?: string;
+      error_type?: string;
+      notification_type?: string;
+      source?: string;              // v0.9.1: SessionStart matcher
+      reason?: string;              // v0.9.1: SessionEnd matcher
+      compaction_trigger?: string;  // v0.9.1: PreCompact/PostCompact matcher
+    },
   ): void {
     const tile = this.findMatchingTile(projectName);
     if (tile) {
@@ -331,6 +347,8 @@ export class TerminalTracker implements vscode.Disposable {
         tile.pendingSubagents = 0;
         tile.teammateIdle = false;
         tile.errorType = undefined;
+        tile.toolError = false;
+        tile.compacting = false;
         this.clearReadyTimer(tile.id);
         if (this.focusedWaitingTile === tile.id) {
           this.focusedWaitingTile = null;
@@ -339,9 +357,10 @@ export class TerminalTracker implements vscode.Disposable {
       } else if (status === 'subagent_start') {
         // v0.9 — Task-tool subagent spawned. Increment counter, stay working.
         tile.pendingSubagents = (tile.pendingSubagents ?? 0) + 1;
-        if (tile.status !== 'done') {
+        if (tile.status !== 'done' && tile.status !== 'offline') {
           tile.status = 'working';
           tile.errorType = undefined; // real activity — clear any prior error
+          tile.compacting = false;    // real activity — can't be compacting too
           tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents);
           tile.ignoredText = undefined;
           this.clearReadyTimer(tile.id);
@@ -375,9 +394,10 @@ export class TerminalTracker implements vscode.Disposable {
         // v0.9 — Agent Teams teammate waiting for a peer. Not "ready" — the
         // user isn't expected to reply; another teammate will feed it work.
         tile.teammateIdle = true;
-        if (tile.status !== 'done') {
+        if (tile.status !== 'done' && tile.status !== 'offline') {
           tile.status = 'working';
           tile.errorType = undefined; // real activity — clear any prior error
+          tile.compacting = false;    // real activity — can't be compacting too
           tile.statusLabel = this.configManager.getLabel('teammate_idle');
           tile.ignoredText = undefined;
           this.clearReadyTimer(tile.id);
@@ -385,7 +405,7 @@ export class TerminalTracker implements vscode.Disposable {
         }
       } else if (status === 'error') {
         // v0.9 — StopFailure. Red, sticky except for UserPromptSubmit.
-        if (tile.status !== 'done') {
+        if (tile.status !== 'done' && tile.status !== 'offline') {
           tile.status = 'error';
           tile.errorType = extra?.error_type;
           tile.statusLabel = this.errorLabel(extra?.error_type);
@@ -405,11 +425,16 @@ export class TerminalTracker implements vscode.Disposable {
         if (hasActiveWork) {
           // Suppress the ready transition — log for debuggability.
           this.log(() => `suppressed ready for ${tile.name}: pendingSubagents=${tile.pendingSubagents}, teammateIdle=${tile.teammateIdle}`);
-        } else if (tile.status !== 'ready' && tile.status !== 'done' && tile.status !== 'error') {
+        } else if (tile.status !== 'ready' && tile.status !== 'done' && tile.status !== 'error' && tile.status !== 'offline') {
           // Notification matcher may refine the ready label.
           tile.status = 'ready';
           tile.statusLabel = this.readyLabelForNotification(extra?.notification_type);
           tile.ignoredText = undefined;
+          // Stop marks end-of-turn — clear transient flags. tool_failure
+          // was from a call earlier this turn; compacting either completed
+          // or was interrupted. Either way they're over at end-of-turn.
+          tile.toolError = false;
+          tile.compacting = false;
           this.startReadyTimer(tile.id);
           changed = true;
         }
@@ -421,16 +446,91 @@ export class TerminalTracker implements vscode.Disposable {
         // that Claude recovered (e.g. auto-retry after rate limit).
         // Keeping error sticky on `ready` still filters out transient
         // Notification events during an outage.
-        if (tile.status !== 'done') {
+        if (tile.status !== 'done' && tile.status !== 'offline') {
           tile.status = 'working';
           // Real tool use indicates the agent is back to work — clear
           // teammate-idle and any lingering error type.
           if (tile.teammateIdle) tile.teammateIdle = false;
           tile.errorType = undefined;
+          // A successful PreToolUse clears a prior tool_failure flag — if the
+          // next tool call succeeded far enough to fire PreToolUse, the
+          // previous failure is old news.
+          if (tile.toolError) tile.toolError = false;
+          // Compaction had better be done if we're firing a tool — clear flag.
+          if (tile.compacting) tile.compacting = false;
           tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
           tile.ignoredText = undefined;
           this.clearReadyTimer(tile.id);
           changed = true;
+        }
+      } else if (status === 'session_start') {
+        // v0.9.1 — Claude session came online. If tile was offline, restore
+        // it. Otherwise this is a no-op (session resume while we already
+        // track the terminal).
+        if (tile.status === 'offline') {
+          tile.status = 'idle';
+          tile.statusLabel = this.configManager.getLabel('idle');
+          tile.toolError = false;
+          tile.compacting = false;
+          changed = true;
+        }
+      } else if (status === 'session_end') {
+        // v0.9.1 — session terminated. Only the `logout` and
+        // `prompt_input_exit` matchers mean Claude is genuinely gone;
+        // `clear`, `resume`, `compact` are mid-session bookkeeping.
+        // `bypass_permissions_disabled` and `other` are treated as soft
+        // end events (still mark offline so user knows Claude isn't running).
+        const reason = extra?.reason ?? '';
+        const terminalReasons = ['logout', 'prompt_input_exit', 'bypass_permissions_disabled', 'other'];
+        const isTerminal = terminalReasons.includes(reason) || reason === '';
+        if (isTerminal && tile.status !== 'done') {
+          tile.status = 'offline';
+          tile.statusLabel = this.configManager.getLabel('offline');
+          tile.ignoredText = undefined;
+          tile.pendingSubagents = 0;
+          tile.teammateIdle = false;
+          tile.errorType = undefined;
+          tile.toolError = false;
+          tile.compacting = false;
+          this.clearReadyTimer(tile.id);
+          changed = true;
+        }
+      } else if (status === 'tool_failure') {
+        // v0.9.1 — PostToolUseFailure. Transient flag; no state change.
+        // Gets cleared on next successful PreToolUse (working branch above)
+        // or on Stop/UserPromptSubmit. Shows "Working (tool error)" while set.
+        // Only set the flag when we're already in working — the display
+        // requires working state, so setting it elsewhere is just a leak.
+        if (tile.status === 'working' && !tile.toolError) {
+          tile.toolError = true;
+          tile.statusLabel = this.configManager.getLabel('tool_error');
+          changed = true;
+        }
+      } else if (status === 'compact_start') {
+        // v0.9.1 — PreCompact. Label override while compaction is running.
+        // State stays `working` — compaction isn't user-actionable.
+        // Only set the flag when we can actually display it (working or
+        // idle → working). Any other state would silently hold the flag.
+        if ((tile.status === 'working' || tile.status === 'idle') && !tile.compacting) {
+          tile.compacting = true;
+          tile.status = 'working';
+          tile.statusLabel = this.configManager.getLabel('compacting');
+          this.clearReadyTimer(tile.id);
+          changed = true;
+        }
+      } else if (status === 'compact_end') {
+        // v0.9.1 — PostCompact. Always clear compacting flag regardless of
+        // current status — compaction is over even if the tile has moved
+        // on (e.g. Stop fired first and moved us to ready). Only refresh
+        // the label when we're still in working.
+        if (tile.compacting) {
+          tile.compacting = false;
+          if (tile.status === 'working') {
+            tile.statusLabel = tile.toolError
+              ? this.configManager.getLabel('tool_error')
+              : this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
+            changed = true;
+          }
         }
       }
 
@@ -499,12 +599,14 @@ export class TerminalTracker implements vscode.Disposable {
     tile.status = 'done';
     tile.statusLabel = this.configManager.getLabel('done');
     tile.ignoredText = undefined;
-    // Mark-done is a full park — clear v0.9 transient state so a later
+    // Mark-done is a full park — clear v0.9/v0.9.1 transient state so a later
     // auto-retry or stray signal doesn't show stale "Working (2 agents)" /
-    // "Waiting for teammate" / "Error: rate limit" text.
+    // "Waiting for teammate" / "Error: rate limit" / "Compacting…" text.
     tile.pendingSubagents = 0;
     tile.teammateIdle = false;
     tile.errorType = undefined;
+    tile.toolError = false;
+    tile.compacting = false;
     tile.lastActivity = Date.now();
     this.clearReadyTimer(id);
     if (this.focusedWaitingTile === id) {
@@ -551,7 +653,8 @@ export class TerminalTracker implements vscode.Disposable {
     // Auto mode: status-based with lastActivity tiebreak.
     // error floats to the top (above waiting) — errors demand attention more
     // than a tile that's just been waiting a while.
-    const statusOrder: Record<string, number> = { error: 0, waiting: 1, ignored: 2, ready: 3, working: 4, done: 5, idle: 6 };
+    // offline sits below idle — Claude isn't running, nothing actionable.
+    const statusOrder: Record<string, number> = { error: 0, waiting: 1, ignored: 2, ready: 3, working: 4, done: 5, idle: 6, offline: 7 };
     tiles.sort((a, b) => {
       const orderDiff = (statusOrder[a.status] ?? 5) - (statusOrder[b.status] ?? 5);
       if (orderDiff !== 0) return orderDiff;
