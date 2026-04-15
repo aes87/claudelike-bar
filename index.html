@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Claudelike Bar — v0.7 UX Preview</title>
+  <title>Claudelike Bar — UX Preview</title>
   <style>
     :root {
       --vscode-font-family: 'Segoe UI', system-ui, sans-serif;
@@ -408,8 +408,8 @@
 
 <div class="container">
 
-  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.7</span></h1>
-  <p class="tagline">Live status tiles for every Claude Code terminal. <a href="https://github.com/aes87/claudelike-bar">github.com/aes87/claudelike-bar</a></p>
+  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.9</span></h1>
+  <p class="tagline">Live status tiles for every Claude Code terminal. <a href="https://github.com/aes87/claudelike-bar">github.com/aes87/claudelike-bar</a> · <a href="https://open-vsx.org/extension/aes87/claudelike-bar">Open VSX</a></p>
 
   <!-- =============================================================== -->
   <!-- Section 1 — Sidebar preview with context menu + legend           -->
@@ -598,8 +598,18 @@
     </div>
 
     <div class="feature-card">
-      <h3>Debug log <span class="badge">NEW</span></h3>
-      <p>Flip <code>"debug": true</code> in the config. The extension streams hook events, state transitions, and auto-start decisions to a <strong>Claudelike Bar</strong> output channel. The hook script also writes <code>/tmp/claude-dashboard/debug.log</code>. Useful when a tile seems stuck.</p>
+      <h3>Debug log</h3>
+      <p>Flip <code>"debug": true</code> in the config. The extension streams hook events, state transitions, and auto-start decisions to a <strong>Claudelike Bar</strong> output channel. The hook and statusline scripts also write <code>{os.tmpdir()}/claude-dashboard/debug.log</code>. Useful when a tile seems stuck.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Windows / PowerShell support <span class="badge">v0.9.2</span></h3>
+      <p>Auto-start no longer assumes bash. <code>CLAUDELIKE_BAR_NAME</code> flows through VS Code's <code>createTerminal({env})</code> API — cross-platform, no <code>export</code> noise. Per-terminal <code>shellPath</code> lets you pin git-bash (or pwsh, or cmd) when your command needs a specific shell.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Standalone statusline with backup + restore <span class="badge">v0.9.2</span></h3>
+      <p>Context % comes from a completely-independent statusline script. Installing it is opt-in — if you already have one, a modal shows <em>both</em> the command being overwritten and the one being installed before you confirm. Your prior statusline backs up to <code>~/.claude/.claudelike-bar-statusline-backup.json</code>; a <strong>Restore Previous Statusline</strong> palette command (or Claude, via chat) puts it back.</p>
     </div>
 
   </div>
