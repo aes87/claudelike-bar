@@ -233,24 +233,56 @@ Two modes, set by the top-level `sortMode` key:
 
 You can drag tiles in either mode — dragging automatically flips `sortMode` to `"manual"`. To go back to status-based sort, set `"sortMode": "auto"` (the `order` values are left in place, harmlessly ignored, and restored if you switch back).
 
+### Windows / PowerShell — `command` field
+
+The `command` field is passed to `terminal.sendText()` as-is. VS Code's default shell on Windows is PowerShell, which doesn't understand bash syntax like `export` or `&&`. You have three options:
+
+1. **Pin git-bash per terminal** *(recommended if your commands use bash syntax)* — set `shellPath` on each terminal:
+   ```jsonc
+   "my-project": {
+     "autoStart": true,
+     "command": "cd '/c/Users/you/projects/foo' && claude --dangerously-skip-permissions",
+     "shellPath": "C:\\Program Files\\Git\\bin\\bash.exe"
+   }
+   ```
+   Optional `shellArgs` accepts an array of flags (e.g. `["-l"]` for a login shell).
+
+2. **Write PowerShell-native commands** — `;` chains statements; `cd` works with Windows paths:
+   ```jsonc
+   "command": "cd 'C:\\Users\\you\\projects\\foo'; claude --dangerously-skip-permissions"
+   ```
+   No `shellPath` needed — this runs in the VS Code default.
+
+3. **Use cmd.exe** — pin it explicitly:
+   ```jsonc
+   "command": "cd /d C:\\Users\\you\\projects\\foo && claude --dangerously-skip-permissions",
+   "shellPath": "C:\\Windows\\System32\\cmd.exe"
+   ```
+
+The `CLAUDELIKE_BAR_NAME` env var is set by the extension through VS Code's `createTerminal({ env })` API — no shell syntax involved, so every shell on every platform sees it.
+
 ### Context % (Optional Enhancement)
 
-If you use a Claude Code statusline script, add this Node.js snippet to feed context window usage into the tiles. Zero extra dependencies — Node is already installed for Claude Code:
+Context % on tiles comes from a Claude Code statusline script that writes `context_percent` into the status file. The extension ships a standalone one — it's completely independent of the rest of the extension and shares only the status-file format.
 
-```javascript
-#!/usr/bin/env node
-const fs = require('fs'), os = require('os'), path = require('path');
-const input = JSON.parse(fs.readFileSync(0, 'utf8'));
-const project = path.basename(input.workspace?.current_dir || '?');
-const pct = Math.floor(input.context_window?.used_percentage || 0);
-const dir = path.join(os.tmpdir(), 'claude-dashboard');
-fs.mkdirSync(dir, { recursive: true });
-const file = path.join(dir, `${project}.json`);
-let data = { project, timestamp: Math.floor(Date.now() / 1000) };
-try { data = { ...data, ...JSON.parse(fs.readFileSync(file, 'utf8')) }; } catch {}
-data.context_percent = pct;
-fs.writeFileSync(file, JSON.stringify(data));
-```
+**If you don't already have a statusline configured:** the extension offers to install ours during first-run onboarding. You can also run it any time: `Cmd+Shift+P` → **Claudelike Bar: Install Statusline**.
+
+**If you already have a statusline:** running **Install Statusline** will prompt before replacing it — confirming backs up the prior `statusLine` value to `~/.claude/.claudelike-bar-statusline-backup.json`. To restore, run **Claudelike Bar: Restore Previous Statusline** (see Troubleshooting).
+
+**Writing your own statusline integration** — any script that writes the status file format works. The contract:
+
+- **Location** — `{os.tmpdir()}/claude-dashboard/{project}.json`
+- **Project** — `process.env.CLAUDELIKE_BAR_NAME` if set, else `path.basename(cwd)`, sanitized (strip path separators, leading/trailing dots)
+- **Required field** — `context_percent: number` (0–100)
+- **Atomic write** — tmp file + rename, otherwise the hook's concurrent writes will race with yours and clobber status fields. Pattern used by the shipped scripts:
+  ```js
+  const tmp = `${file}.tmp.${process.pid}`;
+  fs.writeFileSync(tmp, JSON.stringify(payload) + '\n');
+  fs.renameSync(tmp, file);
+  ```
+- **Merge, don't overwrite** — the hook writes `status`/`event`/`timestamp` into the same file. Read-merge-write so you don't wipe them.
+
+The shipped script at `hooks/claudelike-statusline.js` is the reference implementation; copy from it rather than inlining — it handles cwd fallbacks, sanitization, atomic writes, and debug logging.
 
 ## Troubleshooting
 
@@ -269,7 +301,11 @@ fs.writeFileSync(file, JSON.stringify(data));
 - If the extension failed to activate (check the log above), no terminals will ever appear — fix the activation error first
 
 **Debugging with the trace log**
-- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), and the hook script writes a trace to `{os.tmpdir()}/claude-dashboard/debug.log`.
+- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), the hook script writes a trace to `{os.tmpdir()}/claude-dashboard/debug.log`, and the statusline script appends its own failures to the same file.
+
+**Put my old statusline back**
+- Run `Cmd+Shift+P` → **Claudelike Bar: Restore Previous Statusline**. It reads `~/.claude/.claudelike-bar-statusline-backup.json`, writes `previous_statusLine` back into `~/.claude/settings.json`, and archives the backup to `…-backup.json.restored.json`.
+- If the command fails or the extension isn't installed, open `~/.claude/.claudelike-bar-statusline-backup.json` and copy `previous_statusLine` back into `~/.claude/settings.json` under `"statusLine"`. The backup file includes a `note` field walking through this. You can also ask Claude Code in any terminal — *"restore my old Claude statusline from the backup"* — and it'll do it for you.
 
 **Tiles stuck on "Working" — never show "Ready for input"**
 - The `dashboard-status.js` hook must be registered on **all 4 events**: `PreToolUse`, `UserPromptSubmit`, `Stop`, and `Notification`. If Stop/Notification are missing, the bar never sees the "finished" signal

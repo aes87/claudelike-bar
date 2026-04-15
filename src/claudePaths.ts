@@ -31,3 +31,19 @@ export function writeSettingsAtomic(settings: unknown): void {
     throw err;
   }
 }
+
+/**
+ * Read the extension's own package.json to get its version string.
+ * Used for stamping metadata into backup files. Returns `"unknown"` on
+ * any failure — this is cosmetic data, not a correctness input.
+ */
+export function readExtensionVersion(extensionPath: string): string {
+  const fs = require('fs') as typeof import('fs');
+  const path = require('path') as typeof import('path');
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8'));
+    return typeof pkg?.version === 'string' ? pkg.version : 'unknown';
+  } catch {
+    return 'unknown';
+  }
+}

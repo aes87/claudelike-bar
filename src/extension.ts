@@ -4,10 +4,12 @@ import { DashboardProvider } from './dashboardProvider';
 import { TerminalTracker } from './terminalTracker';
 import { StatusWatcher } from './statusWatcher';
 import { ConfigManager } from './configManager';
-import { shSingleQuote } from './util';
 import { getStatusDir } from './statusDir';
 import { executeHooksInstallCommand, HOOKS_DOC_URL } from './setup';
-import { executeStatuslineInstallCommand, STATUSLINE_DOC_URL } from './statusline';
+import {
+  executeStatuslineInstallCommand,
+  executeStatuslineRestoreCommand,
+} from './statusline';
 import { showOnboardingNotification, isSetupComplete } from './onboarding';
 import * as path from 'path';
 
@@ -75,6 +77,10 @@ export function activate(context: vscode.ExtensionContext) {
   const installStatuslineCmd = vscode.commands.registerCommand(
     'claudeDashboard.installStatusline',
     () => executeStatuslineInstallCommand(context.extensionPath, (m) => log(m)),
+  );
+  const restoreStatuslineCmd = vscode.commands.registerCommand(
+    'claudeDashboard.restoreStatusline',
+    () => executeStatuslineRestoreCommand((m) => log(m)),
   );
   const showHooksCmd = vscode.commands.registerCommand(
     'claudeDashboard.showHooks',
@@ -175,6 +181,7 @@ export function activate(context: vscode.ExtensionContext) {
     openConfigCmd,
     installHooksCmd,
     installStatuslineCmd,
+    restoreStatuslineCmd,
     showHooksCmd,
     tracker,
     watcher,
@@ -201,12 +208,16 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 /**
- * Create terminals marked `autoStart: true` in the config, export the
- * `CLAUDELIKE_BAR_NAME` env var so the hook script can map the terminal
- * to a tile, then send the configured command. Runs after a grace period
- * so VS Code's persistent-session revival can restore terminals from the
- * previous window first — revived terminals get a `revived (skip)` log
- * entry and are left alone.
+ * Create terminals marked `autoStart: true` in the config, passing the
+ * `CLAUDELIKE_BAR_NAME` env var through the VS Code createTerminal API so
+ * the hook script can map the terminal to a tile. Cross-platform — no
+ * shell-syntax quoting, no visible `export …` noise line. Per-terminal
+ * `shellPath` / `shellArgs` from the config let Windows users pin git-bash
+ * (or any shell) when their `command` uses bash syntax.
+ *
+ * Runs after a grace period so VS Code's persistent-session revival can
+ * restore terminals from the previous window first — revived terminals
+ * get a `revived (skip)` log entry and are left alone.
  */
 function runAutoStart(
   configManager: ConfigManager,
@@ -221,15 +232,19 @@ function runAutoStart(
       log(`  ${name} → revived (skip)`);
       continue;
     }
-    const terminal = vscode.window.createTerminal({ name });
-    // Shell-single-quote the name — JSON.stringify is NOT safe bash quoting.
-    terminal.sendText(`export CLAUDELIKE_BAR_NAME=${shSingleQuote(name)}`);
+    const opts = configManager.getAutoStartTerminalOptions(name);
+    const terminal = vscode.window.createTerminal({
+      name,
+      env: opts.env,
+      ...(opts.shellPath ? { shellPath: opts.shellPath } : {}),
+      ...(opts.shellArgs ? { shellArgs: opts.shellArgs } : {}),
+    });
     const command = configManager.getAutoStartCommand(name);
     if (command) {
-      log(`  ${name} → ${command}`);
+      log(`  ${name} → ${command}${opts.shellPath ? ` [shell: ${opts.shellPath}]` : ''}`);
       terminal.sendText(command);
     } else {
-      log(`  ${name} → (no command)`);
+      log(`  ${name} → (no command)${opts.shellPath ? ` [shell: ${opts.shellPath}]` : ''}`);
     }
   }
 }

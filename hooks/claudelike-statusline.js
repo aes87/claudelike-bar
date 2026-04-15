@@ -18,10 +18,13 @@
  * context % badge on each tile.
  *
  * If you already have a Claude Code `statusLine.command` configured, the
- * extension will NOT overwrite it. You can either (a) keep your statusline
- * and have it write `context_percent` into the status file yourself (see
- * README → "Context % (Optional Enhancement)"), or (b) replace it with this
- * one via the "Claudelike Bar: Install Statusline" command (prompts first).
+ * extension will NOT overwrite it without an explicit confirmation, and
+ * will back it up to `~/.claude/.claudelike-bar-statusline-backup.json` so
+ * "Claudelike Bar: Restore Previous Statusline" can put it back.
+ *
+ * Debug logging: create `<STATUS_DIR>/.debug` to enable a trace log at
+ * `<STATUS_DIR>/debug.log` — the extension toggles this file from config.
+ * When debug is off, all errors are silent (statusline must never fail).
  */
 
 'use strict';
@@ -37,19 +40,40 @@ function sanitizeProject(name) {
     .replace(/^\.+|\.+$/g, '');
 }
 
+// Write a line to <statusDir>/debug.log when the .debug flag file exists.
+// Stays silent otherwise — the statusline must never throw or pollute stdout.
+function debugLog(statusDir, line) {
+  try {
+    if (!fs.existsSync(path.join(statusDir, '.debug'))) return;
+    fs.appendFileSync(
+      path.join(statusDir, 'debug.log'),
+      `[${new Date().toISOString()}] statusline: ${line}\n`,
+    );
+  } catch {
+    // Debug log failure is silent — never fail the statusline on its own log.
+  }
+}
+
 function main() {
   const statusDir = process.env.CLAUDELIKE_STATUS_DIR
     || path.join(os.tmpdir(), 'claude-dashboard');
-  fs.mkdirSync(statusDir, { recursive: true });
+  try { fs.mkdirSync(statusDir, { recursive: true }); } catch (err) {
+    debugLog(statusDir, `mkdir failed: ${err && err.message}`);
+    return;
+  }
 
   let input = '';
   try {
     if (!process.stdin.isTTY) input = fs.readFileSync(0, 'utf8');
-  } catch {}
+  } catch (err) {
+    debugLog(statusDir, `stdin read failed: ${err && err.message}`);
+  }
 
   let data = {};
   if (input) {
-    try { data = JSON.parse(input); } catch {}
+    try { data = JSON.parse(input); } catch (err) {
+      debugLog(statusDir, `stdin JSON parse failed (bytes=${input.length}): ${err && err.message}`);
+    }
   }
 
   const model = (data.model && typeof data.model.display_name === 'string') ? data.model.display_name : '';
@@ -81,7 +105,8 @@ function main() {
   try {
     fs.writeFileSync(tmpPath, JSON.stringify(payload) + '\n');
     fs.renameSync(tmpPath, statusFile);
-  } catch {
+  } catch (err) {
+    debugLog(statusDir, `atomic write to ${statusFile} failed: ${err && err.message}`);
     try { fs.unlinkSync(tmpPath); } catch {}
   }
 
@@ -94,7 +119,14 @@ function main() {
   process.stdout.write(parts.join(' │ '));
 }
 
-try { main(); } catch {
-  // Statusline must never fail — silence all errors.
+try { main(); } catch (err) {
+  // Statusline must never fail Claude's terminal, but when the user turns
+  // debug on they get the reason. Fall back to tmpdir() in case the
+  // failure happened before statusDir was resolved.
+  try {
+    const dir = process.env.CLAUDELIKE_STATUS_DIR
+      || path.join(os.tmpdir(), 'claude-dashboard');
+    debugLog(dir, `main() threw: ${err && err.stack ? err.stack : err}`);
+  } catch {}
 }
 process.exit(0);

@@ -19,6 +19,32 @@ export interface TerminalConfig {
    * normalized fallback (lowercase, stripped whitespace/hyphens).
    */
   projectName?: string | null;
+  /**
+   * Absolute path to a shell executable (e.g.
+   * "C:\\Program Files\\Git\\bin\\bash.exe"). When set, auto-started terminals
+   * use this shell regardless of VS Code's default profile. Lets Windows
+   * users pin git-bash so bash syntax in `command` (`cd && claude`, single
+   * quotes) works. Leave unset to inherit the VS Code default.
+   */
+  shellPath?: string | null;
+  /**
+   * Arguments passed to `shellPath`. Ignored when `shellPath` is unset.
+   * Example (pwsh 7 with no profile): ["-NoProfile"].
+   */
+  shellArgs?: string[] | null;
+}
+
+/**
+ * Options for creating an auto-started terminal. Passed through to
+ * `vscode.window.createTerminal({ name, env, shellPath, shellArgs })`.
+ * `env` is always populated with `CLAUDELIKE_BAR_NAME` so the hook can map
+ * the terminal to a tile; `shellPath`/`shellArgs` come from the config and
+ * are optional.
+ */
+export interface AutoStartTerminalOptions {
+  env: Record<string, string>;
+  shellPath?: string;
+  shellArgs?: string[];
 }
 
 export interface ContextThresholds {
@@ -226,6 +252,29 @@ export class ConfigManager implements vscode.Disposable {
   }
 
   /**
+   * Shell + env options for an auto-started terminal. Returns the env var
+   * needed by the hook script, plus any optional per-terminal `shellPath` /
+   * `shellArgs` override. Cross-platform — no shell-syntax quoting.
+   */
+  getAutoStartTerminalOptions(name: string): AutoStartTerminalOptions {
+    const opts: AutoStartTerminalOptions = {
+      env: { CLAUDELIKE_BAR_NAME: name },
+    };
+    const cfg = this.config.terminals[name];
+    if (cfg?.shellPath && typeof cfg.shellPath === 'string' && cfg.shellPath.length > 0) {
+      opts.shellPath = cfg.shellPath;
+      if (Array.isArray(cfg.shellArgs) && cfg.shellArgs.length > 0) {
+        // Defensive copy + string coercion — JSONC can smuggle arbitrary JSON.
+        // If every entry filters out, drop the key so extension.ts doesn't
+        // pass an empty shellArgs array to createTerminal.
+        const cleaned = cfg.shellArgs.filter((a): a is string => typeof a === 'string');
+        if (cleaned.length > 0) opts.shellArgs = cleaned;
+      }
+    }
+    return opts;
+  }
+
+  /**
    * Ensure a terminal has an entry in the config file.
    * If it already exists, does nothing. If new, appends with defaults and writes.
    */
@@ -409,6 +458,11 @@ export class ConfigManager implements vscode.Disposable {
       '  // projectName: hook project name that maps to this terminal — set this',
       '  //            when the terminal display name differs from the hook cwd',
       '  //            (e.g. "VS Code Enhancement" terminal, project "vscode-enhancement")',
+      '  // shellPath: absolute path to a shell executable. Pin a specific shell for',
+      '  //            this terminal regardless of VS Code\'s default. Useful on',
+      '  //            Windows to force git-bash so `command` (cd && claude) works:',
+      '  //              "shellPath": "C:\\\\Program Files\\\\Git\\\\bin\\\\bash.exe"',
+      '  // shellArgs: optional array of args passed to shellPath (e.g. ["-NoProfile"]).',
       `  "terminals": ${indent(JSON.stringify(terminals, null, 4), 2)}`,
       '}',
       '',

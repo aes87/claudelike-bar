@@ -2,7 +2,7 @@
   "name": "claudelike-bar",
   "displayName": "Claudelike Bar",
   "description": "Sidebar dashboard with live status tiles for Claude Code terminal sessions",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "publisher": "aes87",
   "repository": {
     "type": "git",
@@ -80,6 +80,11 @@
       {
         "command": "claudeDashboard.installStatusline",
         "title": "Install Statusline (for context %)",
+        "category": "Claudelike Bar"
+      },
+      {
+        "command": "claudeDashboard.restoreStatusline",
+        "title": "Restore Previous Statusline",
         "category": "Claudelike Bar"
       },
       {

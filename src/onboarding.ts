@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { runSetup, HOOKS_DOC_URL, isSetupComplete } from './setup';
 import { runStatuslineSetup, isStatuslineConfigured, isClaudelikeStatuslineActive } from './statusline';
+import { readExtensionVersion } from './claudePaths';
 
 /**
  * Onboarding orchestration — coordinates the otherwise-independent
@@ -68,7 +69,9 @@ export async function runFullInstall(extensionPath: string, log: (msg: string) =
     messages.push('kept your existing statusline (context % comes from it if it writes to the status file)');
   } else {
     try {
-      const result = await runStatuslineSetup(extensionPath, false);
+      const result = await runStatuslineSetup(extensionPath, false, {
+        extensionVersion: readExtensionVersion(extensionPath),
+      });
       log(`statusline: scriptInstalled=${result.scriptInstalled}, settingsUpdated=${result.settingsUpdated}, reason=${result.reason ?? '-'}`);
       if (result.settingsUpdated) {
         messages.push('installed statusline (for context %)');
