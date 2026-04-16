@@ -6,6 +6,8 @@ import { claudeDir, hooksDir, settingsPath, writeSettingsAtomic } from './claude
 const HOOK_FILENAME = 'dashboard-status.js';
 const HOOK_EVENTS = [
   'PreToolUse',
+  'PostToolUse',         // v0.9.3: tool completed — the signal that closes
+                         //         the gap between permission approval and Stop
   'UserPromptSubmit',
   'Stop',
   'Notification',

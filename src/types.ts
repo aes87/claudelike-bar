@@ -10,6 +10,9 @@ export type SessionStatus = 'idle' | 'working' | 'ready' | 'waiting' | 'done' | 
  * - `session_start` | `session_end` — lifecycle signals (v0.9.1)
  * - `tool_failure` — transient flag (v0.9.1)
  * - `compact_start` | `compact_end` — label override (v0.9.1)
+ * - `tool_end` — PostToolUse: tool just completed; promotes stuck-ready back
+ *   to working so permission-approved tool runs aren't stuck on "Needs
+ *   permission" until Stop (v0.9.3)
  */
 export type HookStatusSignal =
   | 'working'
@@ -22,7 +25,8 @@ export type HookStatusSignal =
   | 'session_end'
   | 'tool_failure'
   | 'compact_start'
-  | 'compact_end';
+  | 'compact_end'
+  | 'tool_end';
 
 export interface TileData {
   id: number; // stable numeric identity — used as DOM key and in webview messages
@@ -46,6 +50,12 @@ export interface TileData {
   // v0.9.1 — transient flags (don't affect SessionStatus directly)
   toolError?: boolean;        // PostToolUseFailure fired; cleared on next Stop
   compacting?: boolean;       // PreCompact received, no matching PostCompact yet
+  // v0.9.3 — subagent permission prompt is pending on at least one in-flight
+  // subagent. Set when a permission_prompt Notification fires with
+  // pendingSubagents > 0. Cleared only when pendingSubagents drops to 0 or
+  // on UserPromptSubmit/Stop — we don't have per-subagent permission
+  // tracking, so we wait until all subagents have finished (conservative).
+  subagentPermissionPending?: boolean;
 }
 
 export type WebviewMessage =

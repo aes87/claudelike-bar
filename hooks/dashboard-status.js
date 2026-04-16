@@ -19,6 +19,7 @@
  *   PostToolUseFailure              → "tool_failure"           (v0.9.1)
  *   PreCompact                      → "compact_start"          (v0.9.1)
  *   PostCompact                     → "compact_end"            (v0.9.1)
+ *   PostToolUse                     → "tool_end"               (v0.9.3)
  *   PreToolUse, UserPromptSubmit,
  *   everything else                 → "working"
  *
@@ -118,6 +119,7 @@ function main() {
   //   PostToolUseFailure    → tool_failure (v0.9.1 — transient flag)
   //   PreCompact            → compact_start (v0.9.1 — label override)
   //   PostCompact           → compact_end (v0.9.1 — clear override)
+  //   PostToolUse           → tool_end (v0.9.3 — closes the post-permission gap)
   //   Everything else       → working
   let status = 'working';
   if (event === 'Stop' || event === 'Notification') status = 'ready';
@@ -130,6 +132,7 @@ function main() {
   else if (event === 'PostToolUseFailure') status = 'tool_failure';
   else if (event === 'PreCompact') status = 'compact_start';
   else if (event === 'PostCompact') status = 'compact_end';
+  else if (event === 'PostToolUse') status = 'tool_end';
   const timestamp = Math.floor(Date.now() / 1000);
 
   const outPath = path.join(statusDir, `${project}.json`);
@@ -141,16 +144,22 @@ function main() {
   // the existing file first, merge our fields in, preserve whatever the
   // statusline left behind.
   const ownFields = { project, status, timestamp, event };
-  // Optional fields — only include when we actually have a value. Keeps the
-  // JSON clean and avoids clobbering prior values with empty strings.
-  if (toolName) ownFields.tool_name = toolName;
-  if (agentType) ownFields.agent_type = agentType;
-  if (errorType) ownFields.error_type = errorType;
-  if (notificationType) ownFields.notification_type = notificationType;
-  // v0.9.1 — session/compaction metadata.
-  if (sessionSource) ownFields.source = sessionSource;
-  if (sessionEndReason) ownFields.reason = sessionEndReason;
-  if (compactionTrigger) ownFields.compaction_trigger = compactionTrigger;
+  // Optional event-specific fields — v0.9.3 always write them, even when
+  // empty, so a prior event's values don't leak through Object.assign.
+  // Examples of the leak this prevents:
+  //   Notification(permission_prompt) → Stop: the Stop payload doesn't carry
+  //     notification_type, but Object.assign(existing, ownFields) would keep
+  //     the prior "permission_prompt" string in the file — and the extension
+  //     would then render a stale "Needs permission" label after Stop.
+  //   StopFailure(rate_limit) → Stop: same shape, error_type would linger.
+  // Writing empty strings clobbers cleanly; the extension treats '' as absent.
+  ownFields.tool_name = toolName;
+  ownFields.agent_type = agentType;
+  ownFields.error_type = errorType;
+  ownFields.notification_type = notificationType;
+  ownFields.source = sessionSource;
+  ownFields.reason = sessionEndReason;
+  ownFields.compaction_trigger = compactionTrigger;
 
   let payload = ownFields;
   try {

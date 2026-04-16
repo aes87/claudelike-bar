@@ -77,6 +77,7 @@ export class TerminalTracker implements vscode.Disposable {
       teammateIdle: false,
       toolError: false,
       compacting: false,
+      subagentPermissionPending: false,
     });
   }
 
@@ -95,10 +96,16 @@ export class TerminalTracker implements vscode.Disposable {
   private handleActiveTerminalChange(active: vscode.Terminal | undefined): void {
     const activeId = active ? this.terminalIdMap.get(active) : undefined;
 
-    // Check if we're leaving a tile that was focused while waiting
+    // Check if we're leaving a tile that was focused while waiting.
+    // v0.9.3: `ready` is NOT eligible for this transition — it's too early
+    // in the "needs attention" window to punish a glance-and-leave. The
+    // common "approve permission → switch back to editor" pattern was
+    // wrongly marking tiles ignored/done while Claude was actively running
+    // the approved tool. After 60s the tile becomes `waiting`, at which
+    // point glance-and-leave does get punished (mode-dependent).
     if (this.focusedWaitingTile !== null && this.focusedWaitingTile !== activeId) {
       const tile = this.terminals.get(this.focusedWaitingTile);
-      if (tile && (tile.status === 'waiting' || tile.status === 'ready')) {
+      if (tile && tile.status === 'waiting') {
         // User looked and left without acting — mode-dependent transition.
         // Also clear v0.9 transient flags — the tile is being explicitly
         // parked, so stale subagent counts or teammate-idle flags shouldn't
@@ -119,6 +126,7 @@ export class TerminalTracker implements vscode.Disposable {
         tile.errorType = undefined;
         tile.toolError = false;
         tile.compacting = false;
+        tile.subagentPermissionPending = false;
         this.clearReadyTimer(tile.id);
       }
       this.focusedWaitingTile = null;
@@ -127,7 +135,11 @@ export class TerminalTracker implements vscode.Disposable {
     for (const [id, tile] of this.terminals) {
       tile.isActive = id === activeId;
 
-      // If focusing a tile that's waiting or ready, start tracking it
+      // If focusing a tile that's waiting or ready, start tracking it —
+      // the focus-loss transition (above) still only fires when status is
+      // `waiting` by the time the user leaves, but we want to start the
+      // tracking window as soon as they look at a ready tile so the later
+      // waiting transition can act on it.
       if (id === activeId && (tile.status === 'waiting' || tile.status === 'ready')) {
         this.focusedWaitingTile = id;
       }
@@ -214,20 +226,14 @@ export class TerminalTracker implements vscode.Disposable {
       tile.icon = cfg?.icon ?? ICON_MAP[tile.name] ?? null;
       tile.contextWarn = thresholds.warn;
       tile.contextCrit = thresholds.crit;
-      // Refresh status label — recompose v0.9 / v0.9.1 rich labels from
-      // current flags. Skip `ignored` (uses custom passive-aggressive text).
+      // Refresh status label — recompose v0.9 / v0.9.1 / v0.9.3 rich labels
+      // from current flags. Skip `ignored` (uses custom passive-aggressive text).
       if (tile.status === 'ignored') {
         // keep tile.statusLabel as-is (random ignored text)
       } else if (tile.status === 'error') {
         tile.statusLabel = this.errorLabel(tile.errorType);
-      } else if (tile.status === 'working' && tile.compacting) {
-        tile.statusLabel = this.configManager.getLabel('compacting');
-      } else if (tile.status === 'working' && tile.teammateIdle) {
-        tile.statusLabel = this.configManager.getLabel('teammate_idle');
-      } else if (tile.status === 'working' && tile.toolError) {
-        tile.statusLabel = this.configManager.getLabel('tool_error');
       } else if (tile.status === 'working') {
-        tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
+        tile.statusLabel = this.workingLabel(tile);
       } else {
         tile.statusLabel = this.configManager.getLabel(tile.status);
       }
@@ -287,6 +293,26 @@ export class TerminalTracker implements vscode.Disposable {
     return base;
   }
 
+  /**
+   * Compose the label a `working` tile should show, respecting the cascade
+   * of transient flags. Single source of truth used by both the state
+   * machine and `refreshFromConfig`. Priority (highest first):
+   *   subagentPermissionPending — user action required on a subagent
+   *   compacting                — context compaction in progress
+   *   teammateIdle              — Agent Teams peer waiting
+   *   toolError                 — a recent tool call failed
+   *   default                   — "Working" with optional subagent count
+   */
+  private workingLabel(tile: TileData): string {
+    if (tile.subagentPermissionPending) {
+      return this.configManager.getLabel('subagent_permission');
+    }
+    if (tile.compacting) return this.configManager.getLabel('compacting');
+    if (tile.teammateIdle) return this.configManager.getLabel('teammate_idle');
+    if (tile.toolError) return this.configManager.getLabel('tool_error');
+    return this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
+  }
+
   /** Map a StopFailure error_type matcher to a human-readable error label. */
   private errorLabel(errorType: string | undefined): string {
     const base = this.configManager.getLabel('error');
@@ -342,13 +368,14 @@ export class TerminalTracker implements vscode.Disposable {
       // clears subagent counter and teammate-idle flag.
       if (event === 'UserPromptSubmit') {
         tile.status = 'working';
-        tile.statusLabel = this.configManager.getLabel('working');
-        tile.ignoredText = undefined;
         tile.pendingSubagents = 0;
         tile.teammateIdle = false;
         tile.errorType = undefined;
         tile.toolError = false;
         tile.compacting = false;
+        tile.subagentPermissionPending = false;
+        tile.ignoredText = undefined;
+        tile.statusLabel = this.workingLabel(tile);
         this.clearReadyTimer(tile.id);
         if (this.focusedWaitingTile === tile.id) {
           this.focusedWaitingTile = null;
@@ -361,17 +388,26 @@ export class TerminalTracker implements vscode.Disposable {
           tile.status = 'working';
           tile.errorType = undefined; // real activity — clear any prior error
           tile.compacting = false;    // real activity — can't be compacting too
-          tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents);
           tile.ignoredText = undefined;
+          tile.statusLabel = this.workingLabel(tile);
           this.clearReadyTimer(tile.id);
           changed = true;
         }
       } else if (status === 'subagent_stop') {
         // v0.9 — subagent finished. Decrement counter (floor 0).
         tile.pendingSubagents = Math.max(0, (tile.pendingSubagents ?? 0) - 1);
-        // Refresh label if we're showing a subagent count
+        // v0.9.3 — when all subagents finish, any pending subagent-permission
+        // indicator is stale by definition. We don't track per-subagent
+        // permissions, so clearing on count=0 is the conservative rule:
+        // if another subagent is still running its prompt could still be
+        // outstanding, so we keep the flag until the group is done.
+        if (tile.pendingSubagents === 0 && tile.subagentPermissionPending) {
+          tile.subagentPermissionPending = false;
+        }
         if (tile.status === 'working') {
-          const newLabel = this.labelWithSubagents('working', tile.pendingSubagents);
+          // Label change is always possible (subagent count decreased and
+          // may have cleared the permission flag).
+          const newLabel = this.workingLabel(tile);
           if (tile.statusLabel !== newLabel) {
             tile.statusLabel = newLabel;
             changed = true;
@@ -398,17 +434,21 @@ export class TerminalTracker implements vscode.Disposable {
           tile.status = 'working';
           tile.errorType = undefined; // real activity — clear any prior error
           tile.compacting = false;    // real activity — can't be compacting too
-          tile.statusLabel = this.configManager.getLabel('teammate_idle');
           tile.ignoredText = undefined;
+          tile.statusLabel = this.workingLabel(tile);
           this.clearReadyTimer(tile.id);
           changed = true;
         }
       } else if (status === 'error') {
         // v0.9 — StopFailure. Red, sticky except for UserPromptSubmit.
+        // Only read error_type when the originating event was StopFailure —
+        // the hook's read-merge-write preserves the field across subsequent
+        // events that don't carry it (v0.9.3 F2).
         if (tile.status !== 'done' && tile.status !== 'offline') {
+          const errorType = event === 'StopFailure' ? extra?.error_type : undefined;
           tile.status = 'error';
-          tile.errorType = extra?.error_type;
-          tile.statusLabel = this.errorLabel(extra?.error_type);
+          tile.errorType = errorType;
+          tile.statusLabel = this.errorLabel(errorType);
           tile.ignoredText = undefined;
           this.clearReadyTimer(tile.id);
           changed = true;
@@ -417,26 +457,71 @@ export class TerminalTracker implements vscode.Disposable {
         // Stop/Notification → ready, then 60s timer → waiting.
         // v0.9: if a subagent is still running or a teammate is idle, the
         // parent turn ended but work is genuinely in-flight — stay `working`.
+        // v0.9.3 (F6): when a Notification fires during active subagent work,
+        //   a permission_prompt for the subagent would otherwise disappear.
+        //   Reflect it as a label override on the parent tile so the user
+        //   sees there's a prompt to act on, without losing the subagent
+        //   counter.
         // `done` is a sticky end state (user explicitly parked via
         // Mark-as-done) — only UserPromptSubmit un-parks it.
         // `ignored` is NOT sticky — it's auto-assigned by passive-aggressive
         // mode, so real activity (Stop/Notification) should override it.
+        // v0.9.3 (F2): only trust extra.notification_type when the originating
+        //   event was actually a Notification — the hook's read-merge-write
+        //   persists the field into Stop events that don't carry it.
+        const notifType = event === 'Notification' ? extra?.notification_type : undefined;
         const hasActiveWork = (tile.pendingSubagents ?? 0) > 0 || tile.teammateIdle;
         if (hasActiveWork) {
-          // Suppress the ready transition — log for debuggability.
-          this.log(() => `suppressed ready for ${tile.name}: pendingSubagents=${tile.pendingSubagents}, teammateIdle=${tile.teammateIdle}`);
-        } else if (tile.status !== 'ready' && tile.status !== 'done' && tile.status !== 'error' && tile.status !== 'offline') {
-          // Notification matcher may refine the ready label.
-          tile.status = 'ready';
-          tile.statusLabel = this.readyLabelForNotification(extra?.notification_type);
-          tile.ignoredText = undefined;
-          // Stop marks end-of-turn — clear transient flags. tool_failure
-          // was from a call earlier this turn; compacting either completed
-          // or was interrupted. Either way they're over at end-of-turn.
-          tile.toolError = false;
-          tile.compacting = false;
-          this.startReadyTimer(tile.id);
-          changed = true;
+          // v0.9.3 (F6): a permission_prompt arriving while subagents are
+          // in-flight is almost certainly on behalf of a subagent — surface
+          // it as a flag that drives the working label. Gated on
+          // pendingSubagents > 0 so a teammate-only `teammate_idle` scenario
+          // keeps its own "Waiting for teammate" label instead of being
+          // mislabeled as subagent permission.
+          if (notifType === 'permission_prompt'
+              && tile.status === 'working'
+              && (tile.pendingSubagents ?? 0) > 0
+              && !tile.subagentPermissionPending) {
+            tile.subagentPermissionPending = true;
+            tile.statusLabel = this.workingLabel(tile);
+            changed = true;
+          } else {
+            this.log(() => `suppressed ready for ${tile.name}: pendingSubagents=${tile.pendingSubagents}, teammateIdle=${tile.teammateIdle}, notifType=${notifType ?? '-'}`);
+          }
+        } else if (tile.status !== 'done' && tile.status !== 'error' && tile.status !== 'offline') {
+          // Transition into ready, OR refresh the label when already ready
+          // (v0.9.3 F3). The prior guard `tile.status !== 'ready'` left
+          // stale "Needs permission" labels stuck across the end-of-turn
+          // Stop event — lift it, and only fire `changed` if the label
+          // actually differs.
+          const newLabel = this.readyLabelForNotification(notifType);
+          if (tile.status !== 'ready') {
+            tile.status = 'ready';
+            tile.statusLabel = newLabel;
+            tile.ignoredText = undefined;
+            // Stop marks end-of-turn — clear transient flags. tool_failure
+            // was from a call earlier this turn; compacting either completed
+            // or was interrupted. Either way they're over at end-of-turn.
+            tile.toolError = false;
+            tile.compacting = false;
+            // subagentPermissionPending is a working-only flag — a transition
+            // to ready means the group has wrapped up (or Stop arrived while
+            // the flag was stale). Clear it so it doesn't resurface if the
+            // tile later cycles through working again.
+            tile.subagentPermissionPending = false;
+            this.startReadyTimer(tile.id);
+            changed = true;
+          } else if (tile.statusLabel !== newLabel) {
+            tile.statusLabel = newLabel;
+            // v0.9.3 (F3): a fresh Notification in an already-ready tile
+            // deserves a fresh 60s attention window. Without this, a
+            // permission_prompt arriving late into a ready state would
+            // decay faster than if it had triggered the initial transition.
+            if (event === 'Notification') {
+              this.startReadyTimer(tile.id);
+            }
+            changed = true;
+          }
         }
       } else if (status === 'working') {
         // PreToolUse → working. `done` is a sticky end state (user explicitly
@@ -458,20 +543,49 @@ export class TerminalTracker implements vscode.Disposable {
           if (tile.toolError) tile.toolError = false;
           // Compaction had better be done if we're firing a tool — clear flag.
           if (tile.compacting) tile.compacting = false;
-          tile.statusLabel = this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
+          // v0.9.3 — PreToolUse is "real activity from the parent" and so
+          // belongs in the same clear set as teammateIdle / toolError /
+          // compacting. Otherwise a subagent-permission label would linger
+          // through the parent's next tool call (the flag would only clear
+          // on a subsequent PostToolUse). If the subagent's prompt is
+          // genuinely still outstanding, a fresh Notification will re-set
+          // the flag on the next hook fire.
+          if (tile.subagentPermissionPending) tile.subagentPermissionPending = false;
           tile.ignoredText = undefined;
+          tile.statusLabel = this.workingLabel(tile);
           this.clearReadyTimer(tile.id);
           changed = true;
         }
       } else if (status === 'session_start') {
         // v0.9.1 — Claude session came online. If tile was offline, restore
-        // it. Otherwise this is a no-op (session resume while we already
-        // track the terminal).
+        // it. v0.9.3 (F5) — a `startup` or `clear` source means the session
+        // is starting fresh (boot, or user-initiated /clear), so stale
+        // `working` state from a prior-session crash should be reset too.
+        // `resume` and `compact` are mid-session bookkeeping — leave state
+        // alone. `done` remains sticky (user explicitly parked).
+        const src = extra?.source ?? '';
+        const isFreshStart = src === 'startup' || src === 'clear';
         if (tile.status === 'offline') {
           tile.status = 'idle';
           tile.statusLabel = this.configManager.getLabel('idle');
           tile.toolError = false;
           tile.compacting = false;
+          tile.subagentPermissionPending = false;
+          changed = true;
+        } else if (isFreshStart && tile.status !== 'done' && tile.status !== 'idle') {
+          // A previous session left the tile in some non-idle state (most
+          // commonly `working` after a crash) — reset to idle so the next
+          // UserPromptSubmit is the first observable event.
+          tile.status = 'idle';
+          tile.statusLabel = this.configManager.getLabel('idle');
+          tile.ignoredText = undefined;
+          tile.pendingSubagents = 0;
+          tile.teammateIdle = false;
+          tile.errorType = undefined;
+          tile.toolError = false;
+          tile.compacting = false;
+          tile.subagentPermissionPending = false;
+          this.clearReadyTimer(tile.id);
           changed = true;
         }
       } else if (status === 'session_end') {
@@ -492,6 +606,7 @@ export class TerminalTracker implements vscode.Disposable {
           tile.errorType = undefined;
           tile.toolError = false;
           tile.compacting = false;
+          tile.subagentPermissionPending = false;
           this.clearReadyTimer(tile.id);
           changed = true;
         }
@@ -503,7 +618,7 @@ export class TerminalTracker implements vscode.Disposable {
         // requires working state, so setting it elsewhere is just a leak.
         if (tile.status === 'working' && !tile.toolError) {
           tile.toolError = true;
-          tile.statusLabel = this.configManager.getLabel('tool_error');
+          tile.statusLabel = this.workingLabel(tile);
           changed = true;
         }
       } else if (status === 'compact_start') {
@@ -514,7 +629,7 @@ export class TerminalTracker implements vscode.Disposable {
         if ((tile.status === 'working' || tile.status === 'idle') && !tile.compacting) {
           tile.compacting = true;
           tile.status = 'working';
-          tile.statusLabel = this.configManager.getLabel('compacting');
+          tile.statusLabel = this.workingLabel(tile);
           this.clearReadyTimer(tile.id);
           changed = true;
         }
@@ -526,11 +641,52 @@ export class TerminalTracker implements vscode.Disposable {
         if (tile.compacting) {
           tile.compacting = false;
           if (tile.status === 'working') {
-            tile.statusLabel = tile.toolError
-              ? this.configManager.getLabel('tool_error')
-              : this.labelWithSubagents('working', tile.pendingSubagents ?? 0);
+            tile.statusLabel = this.workingLabel(tile);
             changed = true;
           }
+        }
+      } else if (status === 'tool_end') {
+        // v0.9.3 (F1) — PostToolUse. A tool call just completed successfully.
+        // Primary use: close the gap when the user approves a permission
+        // prompt and the approved tool is the last of the turn — no further
+        // PreToolUse fires, and Stop isn't enough (the ready branch's F3
+        // label refresh only applies when Stop reaches us; PostToolUse is
+        // what bumps status back to `working`).
+        //
+        // Promotion set includes `ignored` alongside `ready` and `error` —
+        // "ignored" is the passive-aggressive park and is explicitly
+        // non-sticky. The sibling `working` / `subagent_start` / `teammate_idle`
+        // branches all promote out of `ignored`; keeping tool_end in that
+        // set stays consistent. `done` and `offline` remain sticky.
+        //
+        // Does NOT clear the `toolError` flag: PostToolUseFailure and
+        // PostToolUse may both fire on a failed tool call, and we want the
+        // "Working (tool error)" indicator to stick until end-of-turn Stop
+        // rather than flicker.
+        if (tile.status === 'ready' || tile.status === 'error' || tile.status === 'ignored') {
+          tile.status = 'working';
+          tile.errorType = undefined;
+          tile.ignoredText = undefined;
+          tile.statusLabel = this.workingLabel(tile);
+          this.clearReadyTimer(tile.id);
+          changed = true;
+        } else if (tile.status === 'working' && tile.subagentPermissionPending) {
+          // The subagent's pending-permission may have just been resolved:
+          // a PostToolUse after the permission was granted is the signal
+          // that the subagent's tool actually ran. We don't have per-subagent
+          // permission tracking, but clearing on any PostToolUse while
+          // subagents are still running is the conservative refresh.
+          tile.subagentPermissionPending = false;
+          const newLabel = this.workingLabel(tile);
+          if (tile.statusLabel !== newLabel) {
+            tile.statusLabel = newLabel;
+            changed = true;
+          }
+        } else {
+          // Explicit no-op log: working-state PostToolUse is the common case
+          // and is intentionally a no-op, but silence makes debugging stuck
+          // tiles harder. Mirror the pattern used elsewhere in this switch.
+          this.log(() => `tool_end no-op ${tile.name}: status=${tile.status}`);
         }
       }
 
@@ -607,6 +763,7 @@ export class TerminalTracker implements vscode.Disposable {
     tile.errorType = undefined;
     tile.toolError = false;
     tile.compacting = false;
+    tile.subagentPermissionPending = false;
     tile.lastActivity = Date.now();
     this.clearReadyTimer(id);
     if (this.focusedWaitingTile === id) {

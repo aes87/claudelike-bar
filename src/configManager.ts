@@ -83,6 +83,8 @@ const DEFAULT_LABELS: Record<string, string> = {
   offline: 'Offline',
   compacting: 'Compacting context…',
   tool_error: 'Working (tool error)',
+  // v0.9.3 — subagent permission prompt while parent is still working
+  subagent_permission: 'Subagent needs permission',
 };
 
 const DEFAULT_IGNORED_TEXTS = [
