@@ -408,7 +408,7 @@
 
 <div class="container">
 
-  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.9</span></h1>
+  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.11</span></h1>
   <p class="tagline">Live status tiles for every Claude Code terminal. <a href="https://github.com/aes87/claudelike-bar">github.com/aes87/claudelike-bar</a> · <a href="https://open-vsx.org/extension/aes87/claudelike-bar">Open VSX</a></p>
 
   <!-- =============================================================== -->
@@ -612,6 +612,31 @@
       <p>Context % comes from a completely-independent statusline script. Installing it is opt-in — if you already have one, a modal shows <em>both</em> the command being overwritten and the one being installed before you confirm. Your prior statusline backs up to <code>~/.claude/.claudelike-bar-statusline-backup.json</code>; a <strong>Restore Previous Statusline</strong> palette command (or Claude, via chat) puts it back.</p>
     </div>
 
+    <div class="feature-card">
+      <h3>Path-based project identity <span class="badge">v0.10</span></h3>
+      <p>Projects are keyed by absolute <code>path</code>, not terminal name. Collision-resistant slug derivation means two projects both named <code>api</code> in different trees get distinct identities (<code>client-a-api</code> vs <code>personal-api</code>). No more basename conflicts in monorepos or multi-root workspaces.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Global config at <code>~/.claude/</code> <span class="badge">v0.10</span></h3>
+      <p>Config moved from the workspace root to <code>~/.claude/claudelike-bar.jsonc</code> — one file across all workspaces, next to your hooks and settings. Workspace-local configs auto-migrate on first load. Two VS Code windows adding terminals simultaneously? Read-merge-write handles it.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Setup wizard <span class="badge">v0.11</span></h3>
+      <p>5-step QuickPick flow: pick your project folders (browse or scan workspace), confirm names with collision-resistant slugs, assign colors (auto round-robin or manual), choose a startup command, review and confirm. Run from the palette: <strong>Claudelike Bar: Set Up Projects</strong>.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>First-run walkthrough + sidebar button <span class="badge">v0.11</span></h3>
+      <p>VS Code's native walkthrough API guides new users through setup. The sidebar empty state shows an <strong>+ Add Project</strong> button for one-click registration. Both link to the setup wizard.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Hook path-lookup index <span class="badge">v0.11</span></h3>
+      <p>Manual terminals (opened without auto-start) now resolve correctly. The extension writes a lightweight <code>~/.claude/claudelike-bar-paths.json</code> index — the hook reads it to map <code>cwd</code> to the right project slug. Atomic writes, trailing-slash normalized.</p>
+    </div>
+
   </div>
 
   <!-- =============================================================== -->
@@ -622,7 +647,7 @@
 
     <h2>Configure it by talking to Claude</h2>
     <p class="lead">
-      The config file is <code style="background: rgba(137,180,250,0.08); color: var(--vscode-terminal-ansiBrightBlue); padding: 1px 5px; border-radius: 3px; font-family: 'Cascadia Code', 'Fira Code', monospace;">.claudelike-bar.jsonc</code> in your workspace root — JSON with comments, auto-created when you first open a terminal.
+      The config file is <code style="background: rgba(137,180,250,0.08); color: var(--vscode-terminal-ansiBrightBlue); padding: 1px 5px; border-radius: 3px; font-family: 'Cascadia Code', 'Fira Code', monospace;">.claudelike-bar.jsonc</code> at <code style="background: rgba(137,180,250,0.08); color: var(--vscode-terminal-ansiBrightBlue); padding: 1px 5px; border-radius: 3px; font-family: 'Cascadia Code', 'Fira Code', monospace;">~/.claude/</code> — JSON with comments, auto-created when you first open a terminal.
       You <em>can</em> edit it by hand, but the easier path is to just tell Claude Code what you want. After installing, open a Claude terminal and say:
       <em>"Walk me through configuring the Claudelike Bar."</em>
     </p>
@@ -655,21 +680,23 @@
       <div class="turn">
         <div class="bubble user">
           <div class="who">You</div>
-          Auto-start world-domination, print-go-brrr, brain-dump, and spore-drive. Each should <code>cd</code> into its project directory and launch Claude.
+          Auto-start world-domination, print-go-brrr, brain-dump, and spore-drive. Each should open in its project directory and launch Claude.
         </div>
         <div class="bubble claude">
           <div class="who">Claude</div>
-          Four terminals configured with per-terminal <code>command</code> overrides:
+          Four terminals configured with <code>path</code> and <code>autoStart</code>:
           <div class="diff">  <span class="k">"world-domination"</span>: {
+    <span class="k">"path"</span>: <span class="s">"/home/you/projects/world-domination"</span>,
     <span class="k">"autoStart"</span>: <span class="b">true</span>,
-    <span class="k">"command"</span>: <span class="s">"cd ~/projects/world-domination && claude"</span>
+    <span class="k">"command"</span>: <span class="s">"claude"</span>
   },
   <span class="k">"print-go-brrr"</span>: {
+    <span class="k">"path"</span>: <span class="s">"/home/you/projects/print-go-brrr"</span>,
     <span class="k">"autoStart"</span>: <span class="b">true</span>,
-    <span class="k">"command"</span>: <span class="s">"cd ~/projects/print-go-brrr && claude"</span>
+    <span class="k">"command"</span>: <span class="s">"claude"</span>
   },
   ...</div>
-          Next time you open VS Code, all four launch and run Claude automatically.
+          The <code>path</code> sets the working directory — no <code>cd</code> needed, works on every platform. Next VS Code launch, all four open automatically.
         </div>
       </div>
 
@@ -682,9 +709,10 @@
           <div class="who">Claude</div>
           Added a per-terminal <code>command</code> override:
           <div class="diff">  <span class="k">"sourdough-ops"</span>: {
+    <span class="k">"path"</span>: <span class="s">"/home/you/projects/sourdough-ops"</span>,
     <span class="k">"color"</span>: <span class="s">"green"</span>,
     <span class="k">"autoStart"</span>: <span class="b">true</span>,
-    <span class="k">"command"</span>: <span class="s">"cd ~/projects/sourdough-ops && claude --mcp-config mcp.json"</span>
+    <span class="k">"command"</span>: <span class="s">"claude --mcp-config mcp.json"</span>
   }</div>
         </div>
       </div>
@@ -706,7 +734,7 @@
     </div>
 
     <p class="footnote">
-      Everything you see in these conversations is plain JSONC in one file. Comments, section headers, and defaults are preserved by the extension's round-trip save — feel free to hand-edit. But most days it's easier to just ask.
+      Everything you see in these conversations is plain JSONC in <code>~/.claude/claudelike-bar.jsonc</code>. Comments, section headers, and defaults are preserved by the extension's round-trip save — feel free to hand-edit. Or run the setup wizard for a guided start. But most days it's easier to just ask.
     </p>
 
   </div>

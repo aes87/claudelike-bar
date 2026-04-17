@@ -36,12 +36,12 @@ That's it. No `jq`, no bash, no special tools.
 ### The fast path
 
 1. Install from [Open VSX](https://open-vsx.org/extension/aes87/claudelike-bar) — or any VS Code-compatible marketplace
-2. Open VS Code, you'll see a notification: **"Claudelike Bar needs to install a Claude Code hook..."**
-3. Click **Install hooks**. Done.
+2. Open VS Code, you'll see a notification: **"Claudelike Bar needs hooks to track terminal status. Set up your projects now?"**
+3. Click **Set Up Projects** to run the wizard, or **Install Hooks Only** for a minimal start.
 
-The extension writes a small hook script to `~/.claude/hooks/dashboard-status.js` and registers 4 event handlers in `~/.claude/settings.json`. Tiles start updating on your next Claude turn. If you want to inspect what gets written first, click **Show me the hooks** on that notification — it opens [HOOKS.md](docs/HOOKS.md), which shows every file in full.
+The extension writes a hook script to `~/.claude/hooks/dashboard-status.js` and registers event handlers in `~/.claude/settings.json`. Config lives at `~/.claude/claudelike-bar.jsonc` — a single file across all workspaces. Tiles start updating on your next Claude turn.
 
-You can also run the install manually any time: `Cmd+Shift+P` → **Claudelike Bar: Install Hooks**.
+You can also run install manually: `Cmd+Shift+P` → **Claudelike Bar: Install Hooks**.
 
 ### Prefer the command line?
 
@@ -113,20 +113,25 @@ Claude will read `~/.claude/claudelike-bar.jsonc`, ask what projects you care ab
 
 ## Features
 
+- **Setup wizard** — 5-step guided onboarding: pick folders, name projects, assign colors, choose command, review *(v0.11)*
+- **Global config** — single `~/.claude/claudelike-bar.jsonc` across all workspaces, auto-migrated from workspace-local *(v0.10)*
+- **Path-based identity** — projects keyed by absolute path, collision-resistant slugs, no more basename conflicts *(v0.10)*
 - **Live status tiles** for every open Claude Code session
 - **Animated dots** — green pulse (working), amber blink (waiting for you), cyan glow (done)
 - **Click to switch** — stops the raccoon behavior
 - **Sort modes** — `auto` (status-based: waiting floats to top) or `manual` (drag to arrange)
 - **Drag and drop reordering** — grab any tile, drop it where you want; order persists
-- **Mark as done** — right-click → "Mark as done" parks a session: sinks to bottom of auto-sort, goes quiet, ignores background hook events. Un-parks only when you submit a new prompt in that terminal.
+- **Mark as done** — right-click → "Mark as done" parks a session: sinks to bottom, goes quiet, ignores background events
 - **Two personality modes** — chill (quiet) or passive-aggressive (guilt trips)
 - **Context window %** — each tile shows how full the session's context is
 - **Color-coded borders** — per-terminal theme colors
 - **Nicknames** — custom display names for terminals
-- **Auto-start** — mark terminals to launch on VS Code open, each with its own startup command
+- **Auto-start** — mark terminals to launch on VS Code open, each with its own startup command and working directory
+- **First-run walkthrough** — VS Code's native walkthrough API guides new users *(v0.11)*
+- **Sidebar Add Project button** — one-click project registration from the empty state *(v0.11)*
 - **Keyboard nav** — arrow keys / j/k, Enter to switch
 - **Debug log** — toggle on to trace every hook event and state transition
-- **DOM diffing** — no flicker, patches only what changed
+- **Cross-platform** — Windows, macOS, Linux; PowerShell, bash, zsh, fish
 
 ## How It Works
 
@@ -164,11 +169,11 @@ The "ignored" state only activates in passive-aggressive mode. Messages include 
 - *"Auto-start world-domination when VS Code opens"*
 - *"Give the yeet-to-prod terminal a nickname"*
 
-Claude will read `.claudelike-bar.jsonc`, make the change, and the extension picks it up immediately. No restart needed.
+Claude will read `~/.claude/claudelike-bar.jsonc`, make the change, and the extension picks it up immediately. No restart needed.
 
 ### Manual configuration
 
-All settings live in `.claudelike-bar.jsonc` in your workspace root. The file is auto-created when you first open a terminal — you don't need to create it manually.
+All settings live in `~/.claude/claudelike-bar.jsonc` — a single global file next to your Claude Code hooks and settings. Auto-created when you first open a terminal or run the setup wizard.
 
 The file supports comments and is organized into sections:
 
@@ -209,18 +214,18 @@ The file supports comments and is organized into sections:
 
   "terminals": {
     "world-domination": {
+      "path": "/home/you/projects/world-domination",
       "color": "cyan",
       "icon": "calendar",
       "autoStart": true,
-      "cwd": "~/projects/world-domination",
       "command": "claude"
     },
     "yeet-to-prod": {
+      "path": "/home/you/projects/yeet-to-prod",
       "color": "yellow",
       "icon": "server",
       "nickname": "deploy",
       "autoStart": true,
-      "cwd": "~/projects/yeet-to-prod",
       "command": "claude"
     }
   }
@@ -231,6 +236,7 @@ The file supports comments and is organized into sections:
 
 | Field | Type | Default | What It Does |
 |-------|------|---------|--------------|
+| `path` | string \| null | *unset* | Absolute path to the project directory. Canonical identity — used for matching hook updates to tiles and deriving collision-free status filenames. Also the default `cwd` when `cwd` is unset. Set automatically by the setup wizard or "Register Project" command. |
 | `color` | string | auto | `cyan`, `green`, `blue`, `magenta`, `yellow`, `white`, `red` |
 | `icon` | string \| null | auto | Any [VS Code codicon](https://microsoft.github.io/vscode-codicons/dist/codicon.html) name |
 | `nickname` | string \| null | `null` | Display name shown on tile instead of terminal name |
@@ -313,7 +319,7 @@ The shipped script at `hooks/claudelike-statusline.js` is the reference implemen
 - If the extension failed to activate (check the log above), no terminals will ever appear — fix the activation error first
 
 **Debugging with the trace log**
-- Set `"debug": true` in `.claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), the hook script writes a trace to `{os.tmpdir()}/claude-dashboard/debug.log`, and the statusline script appends its own failures to the same file.
+- Set `"debug": true` in `~/.claude/claudelike-bar.jsonc`. The extension logs every hook event and state transition to the **Claudelike Bar** output channel (`Ctrl+Shift+U`), the hook script writes a trace to `{os.tmpdir()}/claude-dashboard/debug.log`, and the statusline script appends its own failures to the same file.
 
 **Put my old statusline back**
 - Run `Cmd+Shift+P` → **Claudelike Bar: Restore Previous Statusline**. It reads `~/.claude/.claudelike-bar-statusline-backup.json`, writes `previous_statusLine` back into `~/.claude/settings.json`, and archives the backup to `…-backup.json.restored.json`.
