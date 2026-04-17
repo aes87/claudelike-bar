@@ -167,7 +167,7 @@ All commands are available from the command palette (`Cmd+Shift+P` / `Ctrl+Shift
 | Command | What It Does |
 |---------|-------------|
 | **Set Up Projects** | 5-step setup wizard — pick folders, name projects, assign colors, choose command, review. Best for first-time setup or reconfiguring after an upgrade. |
-| **Register Project** | Add a single project — folder picker, slug assignment, writes one entry. Quick add without the full wizard. |
+| **Register Project** | Add a project and open it immediately — folder picker, slug assignment, terminal opens with Claude running. Also the "+" button in the sidebar header. |
 | **Open Config** | Opens `~/.claude/claudelike-bar.jsonc` in the editor. Also available as the gear icon in the sidebar header. |
 | **Install Hooks** | Copies the hook script to `~/.claude/hooks/` and registers event handlers in `~/.claude/settings.json`. Idempotent. |
 | **Install Statusline** | Installs the optional context % statusline script. Prompts before replacing an existing statusline. |
