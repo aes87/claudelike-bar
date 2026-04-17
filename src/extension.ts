@@ -104,7 +104,11 @@ export function activate(context: vscode.ExtensionContext) {
   // fails to display (e.g., window unavailable), we want to try again next
   // activation rather than silently silencing it forever.
   if (!isSetupComplete() && !context.globalState.get<boolean>(SETUP_PROMPTED_KEY)) {
-    showOnboardingNotification(context.extensionPath, (m) => log(m)).then(
+    showOnboardingNotification(
+      context.extensionPath,
+      (m) => log(m),
+      () => runSetupWizard(configManager, context.extensionPath, (m) => log(m)),
+    ).then(
       () => context.globalState.update(SETUP_PROMPTED_KEY, true),
       (err) => log(`onboarding notification failed: ${err instanceof Error ? err.message : err}`),
     );

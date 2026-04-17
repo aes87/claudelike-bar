@@ -4,12 +4,10 @@ import { runStatuslineSetup, isStatuslineConfigured, isClaudelikeStatuslineActiv
 import { readExtensionVersion } from './claudePaths';
 
 /**
- * Onboarding orchestration — coordinates the otherwise-independent
- * `setup.ts` (hooks) and `statusline.ts` (context %) modules.
- *
- * This file is the ONLY place where both modules meet. Neither setup.ts
- * nor statusline.ts knows about the other; this keeps them true separate
- * concerns that can be exercised or extended independently.
+ * Onboarding orchestration — coordinates three independent modules:
+ * `setup.ts` (hooks), `statusline.ts` (context %), and `wizard.ts`
+ * (project setup). Neither knows about the others; this file is the
+ * only join point.
  */
 
 /**
@@ -20,6 +18,7 @@ import { readExtensionVersion } from './claudePaths';
 export async function showOnboardingNotification(
   extensionPath: string,
   log: (msg: string) => void,
+  onSetupProjects?: () => Promise<void>,
 ): Promise<void> {
   const pick = await vscode.window.showInformationMessage(
     'Claudelike Bar needs hooks to track terminal status. Set up your projects now?',
@@ -30,8 +29,8 @@ export async function showOnboardingNotification(
     'Later',
   );
 
-  if (pick === 'Set Up Projects') {
-    await vscode.commands.executeCommand('claudeDashboard.setupProjects');
+  if (pick === 'Set Up Projects' && onSetupProjects) {
+    await onSetupProjects();
   } else if (pick === 'Install Hooks Only') {
     await runFullInstall(extensionPath, log);
   } else if (pick === 'Show me the hooks') {

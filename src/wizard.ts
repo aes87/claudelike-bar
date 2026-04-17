@@ -32,8 +32,9 @@ export function scanForProjects(parentDir: string, depth = 1): string[] {
   }
 
   if (depth > 1) {
-    for (const dir of results) {
-      results.push(...scanForProjects(dir, depth - 1));
+    const topLevel = results.length;
+    for (let i = 0; i < topLevel; i++) {
+      results.push(...scanForProjects(results[i], depth - 1));
     }
   }
 
