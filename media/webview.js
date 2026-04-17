@@ -49,9 +49,9 @@ function diffUpdate(tiles) {
     container.innerHTML = '';
     const empty = document.createElement('div');
     empty.className = 'empty-state';
-    empty.innerHTML = 'No terminals open<br><button class="add-project-btn">+ Add Project</button>';
+    empty.innerHTML = 'No terminals open<br><button class="add-project-btn">Set Up Projects</button>';
     empty.querySelector('.add-project-btn').addEventListener('click', () => {
-      vscode.postMessage({ type: 'addProject' });
+      vscode.postMessage({ type: 'setupProjects' });
     });
     container.appendChild(empty);
     selectedIndex = -1;

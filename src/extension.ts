@@ -175,6 +175,10 @@ export function activate(context: vscode.ExtensionContext) {
       case 'addProject':
         vscode.commands.executeCommand('claudeDashboard.registerProject');
         break;
+
+      case 'setupProjects':
+        runSetupWizard(configManager, context.extensionPath, (m) => log(m));
+        break;
     }
   };
 

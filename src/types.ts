@@ -65,7 +65,8 @@ export type WebviewMessage =
   | { type: 'markDone'; id: number }
   | { type: 'reorderTiles'; orderedIds: number[] }
   | { type: 'setColor'; id: number; color: string | null }
-  | { type: 'addProject' };
+  | { type: 'addProject' }
+  | { type: 'setupProjects' };
 
 export interface StatusFileData {
   project: string;
