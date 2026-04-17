@@ -53,17 +53,29 @@ export async function executeRegisterProjectCommand(
   }
 
   // 4. Add to config
+  const command = configManager.getAutoStartCommand() ?? 'claude';
   configManager.addProjectEntry(slug, {
     path: projectPath,
-    command: 'claude',
+    command,
     color: getDefaultColor(slug),
     icon: null,
     nickname: null,
-    autoStart: false,
+    autoStart: true,
   });
 
-  log(`register-project: added "${slug}" → ${projectPath}`);
+  // 5. Open the terminal immediately
+  const terminal = vscode.window.createTerminal({
+    name: slug,
+    cwd: projectPath,
+    env: { CLAUDELIKE_BAR_NAME: slug },
+  });
+  if (command) {
+    terminal.sendText(command);
+  }
+  terminal.show();
+
+  log(`register-project: added "${slug}" → ${projectPath}, terminal opened`);
   vscode.window.showInformationMessage(
-    `Claudelike Bar: registered "${slug}" at ${projectPath}. Set "autoStart": true in the config to launch it on VS Code open.`,
+    `Claudelike Bar: "${slug}" registered and opened.`,
   );
 }
