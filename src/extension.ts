@@ -12,6 +12,7 @@ import {
 } from './statusline';
 import { executeRegisterProjectCommand } from './registerProject';
 import { showOnboardingNotification, isSetupComplete } from './onboarding';
+import { runSetupWizard } from './wizard';
 import * as path from 'path';
 
 const SETUP_PROMPTED_KEY = 'claudelike-bar.setupPrompted';
@@ -86,6 +87,10 @@ export function activate(context: vscode.ExtensionContext) {
   const registerProjectCmd = vscode.commands.registerCommand(
     'claudeDashboard.registerProject',
     () => executeRegisterProjectCommand(configManager, (m) => log(m)),
+  );
+  const setupProjectsCmd = vscode.commands.registerCommand(
+    'claudeDashboard.setupProjects',
+    () => runSetupWizard(configManager, context.extensionPath, (m) => log(m)),
   );
   const showHooksCmd = vscode.commands.registerCommand(
     'claudeDashboard.showHooks',
@@ -188,6 +193,7 @@ export function activate(context: vscode.ExtensionContext) {
     installStatuslineCmd,
     restoreStatuslineCmd,
     registerProjectCmd,
+    setupProjectsCmd,
     showHooksCmd,
     tracker,
     watcher,

@@ -55,6 +55,15 @@ export const window = {
   showOpenDialog: vi.fn(),
 };
 
+export const commands = {
+  executeCommand: vi.fn(),
+  registerCommand: vi.fn(),
+};
+
+export const env = {
+  openExternal: vi.fn(),
+};
+
 export class RelativePattern {
   constructor(public base: any, public pattern: string) {}
 }

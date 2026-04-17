@@ -93,6 +93,11 @@
         "category": "Claudelike Bar"
       },
       {
+        "command": "claudeDashboard.setupProjects",
+        "title": "Set Up Projects",
+        "category": "Claudelike Bar"
+      },
+      {
         "command": "claudeDashboard.showHooks",
         "title": "Show Me the Hooks (open docs)",
         "category": "Claudelike Bar"

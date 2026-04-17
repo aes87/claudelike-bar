@@ -22,15 +22,17 @@ export async function showOnboardingNotification(
   log: (msg: string) => void,
 ): Promise<void> {
   const pick = await vscode.window.showInformationMessage(
-    'Claudelike Bar needs to install a Claude Code hook so tiles reflect live status. ' +
-    'Nothing is written outside ~/.claude/.',
+    'Claudelike Bar needs hooks to track terminal status. Set up your projects now?',
     { modal: false },
-    'Install',
+    'Set Up Projects',
+    'Install Hooks Only',
     'Show me the hooks',
     'Later',
   );
 
-  if (pick === 'Install') {
+  if (pick === 'Set Up Projects') {
+    await vscode.commands.executeCommand('claudeDashboard.setupProjects');
+  } else if (pick === 'Install Hooks Only') {
     await runFullInstall(extensionPath, log);
   } else if (pick === 'Show me the hooks') {
     await vscode.env.openExternal(vscode.Uri.parse(HOOKS_DOC_URL));
