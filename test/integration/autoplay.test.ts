@@ -18,7 +18,11 @@ import * as path from 'path';
 import { runTests } from '@vscode/test-electron';
 
 async function main(): Promise<void> {
-  const extensionDevelopmentPath = path.resolve(__dirname, '../../');
+  // __dirname at runtime is test/integration/out/ (tsc outDir), so the repo
+  // root is three levels up — not two. Getting this wrong silently points
+  // VS Code at an empty "extension" path, so the extension never activates
+  // and claudeDashboard.mainView.focus doesn't exist at runtime.
+  const extensionDevelopmentPath = path.resolve(__dirname, '../../../');
   const extensionTestsPath = path.resolve(__dirname, './autoplay.runner');
 
   // Launch a VS Code instance, install the extension from source, and run
