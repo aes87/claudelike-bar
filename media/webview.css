@@ -306,3 +306,20 @@ body {
 .color-swatch:hover {
   border-color: var(--vscode-focusBorder);
 }
+
+/* v0.13.2 (#10) — native color-picker swatch. <input type="color"> ships
+ * with browser chrome; strip it so the swatch row stays uniform. The
+ * conic-gradient backdrop signals "any color" without reading as one of
+ * the ANSI swatches. */
+.color-swatch-custom {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0;
+  background: conic-gradient(
+    from 0deg,
+    #ff5252, #ffb800, #ffee00, #6bff52, #00d4ff, #7c52ff, #ff52d4, #ff5252
+  );
+}
+.color-swatch-custom::-webkit-color-swatch-wrapper { padding: 0; }
+.color-swatch-custom::-webkit-color-swatch { border: none; border-radius: 1px; }
+.color-swatch-custom::-moz-color-swatch { border: none; border-radius: 1px; }

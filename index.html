@@ -408,7 +408,7 @@
 
 <div class="container">
 
-  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.11.5</span></h1>
+  <h1>Claudelike Bar <span style="color: var(--vscode-descriptionForeground); font-weight: 400;">— v0.13.2</span></h1>
   <p class="tagline">Live status tiles for every Claude Code terminal. <a href="https://github.com/aes87/claudelike-bar">github.com/aes87/claudelike-bar</a> · <a href="https://open-vsx.org/extension/aes87/claudelike-bar">Open VSX</a></p>
 
   <!-- =============================================================== -->
@@ -558,6 +558,36 @@
   <!-- =============================================================== -->
 
   <div class="feature-row">
+
+    <div class="feature-card">
+      <h3>Audio alerts <span class="badge">v0.12</span></h3>
+      <p>Optional chime when Claude is waiting on you. Two slots — one for end-of-turn (<code>Stop</code> event), one optional for mid-job permission prompts (<code>Notification</code> event) — so you can tell "done" apart from "blocked on approval" by ear. Off by default; bring your own MP3/WAV/OGG, drop into <code>~/.claude/sounds/</code>, point the config at it. Right-click any tile to mute/unmute.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Launch any registered project <span class="badge">v0.13</span></h3>
+      <p>Set up a big config of registered projects with <code>autoStart: false</code> on the ones you don't want auto-launching. Then open them on demand: <strong>rocket icon</strong> in the sidebar header (or the <strong>Launch Registered Project</strong> palette command, or <em>Launch another project…</em> in any tile's right-click menu). QuickPick of every config entry not currently open. Same launch path as auto-start, no drift.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Register without opening <span class="badge">v0.13</span></h3>
+      <p>Register Project flow ends with a <em>"Open terminal now / Register only"</em> choice. Pick "Register only" to add the entry with <code>autoStart: false</code> and launch it whenever via the rocket icon. Build out a 15-project registry without spawning 15 terminals.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Custom color picker <span class="badge">v0.13.2</span></h3>
+      <p>Right-click a tile → swatch row gains a rainbow <code>&lt;input type="color"&gt;</code> at the end. Click → OS color picker → any hex value flows through the same setColor handler. Pairs with the existing CSS-color support: <code>#hex</code>, <code>rgb()</code>, <code>hsl()</code>, <code>var(--anything)</code>.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>"Switch to auto sort" <span class="badge">v0.13.1</span></h3>
+      <p>Once you've dragged tiles around, <code>sortMode</code> flips to <code>"manual"</code> and stays there. Right-click any tile when in manual mode for a one-click <strong>Switch to auto sort</strong> entry — flips it back without opening the config. The entry hides itself when you're already in auto.</p>
+    </div>
+
+    <div class="feature-card">
+      <h3>Auto-start cwd pre-flight <span class="badge">v0.13.1</span></h3>
+      <p>If you've moved/renamed/deleted a project dir, the bar used to surface VS Code's modal <em>"Starting directory does not exist"</em> error per stale entry. Now: <code>fs.existsSync</code> check before <code>createTerminal</code>, missing entries skipped, one warning toast at the end with an <strong>Open Config</strong> action. No modal pile-up.</p>
+    </div>
 
     <div class="feature-card">
       <h3>Drag &amp; drop to reorder <span class="badge">NEW</span></h3>

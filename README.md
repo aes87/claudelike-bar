@@ -124,7 +124,7 @@ Claude will read `~/.claude/claudelike-bar.jsonc`, ask what projects you care ab
 - **Mark as done** — right-click → "Mark as done" parks a session: sinks to bottom, goes quiet, ignores background events
 - **Two personality modes** — chill (quiet) or passive-aggressive (guilt trips)
 - **Context window %** — each tile shows how full the session's context is
-- **Color-coded borders** — per-terminal theme colors
+- **Color-coded borders** — per-terminal theme colors. Right-click a tile → swatch row + custom color picker (any CSS color) *(picker added v0.13.2)*
 - **Nicknames** — custom display names for terminals
 - **Auto-start** — mark terminals to launch on VS Code open, each with its own startup command and working directory
 - **First-run walkthrough** — VS Code's native walkthrough API guides new users *(v0.11)*
@@ -133,6 +133,8 @@ Claude will read `~/.claude/claudelike-bar.jsonc`, ask what projects you care ab
 - **Debug log** — toggle on to trace every hook event and state transition
 - **Cross-platform** — Windows, macOS, Linux; PowerShell, bash, zsh, fish
 - **Audio alerts** — optional chime when Claude finishes, optional second sound for permission prompts; bring your own clips *(v0.12)*
+- **Auto-start safety** — entries with missing `cwd` are skipped with a single summary toast instead of N modal errors *(v0.13.1)*
+- **"Switch to auto sort"** — when in manual mode, right-click any tile to flip back to status-based sort *(v0.13.1)*
 
 ## Audio
 

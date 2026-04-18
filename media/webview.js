@@ -494,6 +494,20 @@ function showContextMenu(e, tileId) {
     });
     picker.appendChild(swatch);
   }
+  // v0.13.2 (#10) — native color picker swatch. Same dimensions as the
+  // ANSI swatches; opens the OS color picker on click. Posts the hex value
+  // through the existing setColor handler — ConfigManager already accepts
+  // any CSS color via VALID_CSS_COLOR (added in v0.11.4 for #1).
+  const customSwatch = document.createElement('input');
+  customSwatch.type = 'color';
+  customSwatch.className = 'color-swatch color-swatch-custom';
+  customSwatch.title = 'Custom color…';
+  customSwatch.value = '#7dcfff'; // sensible starting hue
+  customSwatch.addEventListener('change', () => {
+    vscode.postMessage({ type: 'setColor', id: tileId, color: customSwatch.value });
+    dismissContextMenu();
+  });
+  picker.appendChild(customSwatch);
   menu.appendChild(picker);
 
   // Reset color
