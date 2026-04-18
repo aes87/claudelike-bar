@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { __resetMock, window } from './__mocks__/vscode';
+import { __resetMock, window, workspace, Uri } from './__mocks__/vscode';
 import {
   scanForProjects,
   buildSlugAssignments,
@@ -186,6 +186,12 @@ describe('runSetupWizard', () => {
     __resetMock();
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wizard-flow-'));
     configPath = path.join(tmpDir, 'claudelike-bar.jsonc');
+    // Point the mock workspaceFolders at our isolated tmpDir so the
+    // ConfigManager's migration fallback can't see configs another test
+    // worker wrote to the shared /tmp/test-workspace path.
+    (workspace as any).workspaceFolders = [
+      { uri: (Uri as any).file(tmpDir), name: 'test', index: 0 },
+    ];
   });
 
   it('cancels gracefully when user dismisses step 1', async () => {
