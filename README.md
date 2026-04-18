@@ -134,6 +134,7 @@ Claude will read `~/.claude/claudelike-bar.jsonc`, ask what projects you care ab
 - **Cross-platform** — Windows, macOS, Linux; PowerShell, bash, zsh, fish
 - **Remote development** — runs on the workspace side in WSL2, SSH Remote, Dev Containers, and Codespaces, so hooks/config/status files all line up with where Claude Code actually lives *(v0.13.3)*
 - **Audio alerts** — optional chime when Claude finishes, optional second sound for permission prompts; bring your own clips *(v0.12)*
+- **Launch registered projects on demand** — palette command + sidebar rocket button + tile right-click "Launch another project…" — opens any config entry not currently running. Pairs with the *Register only* option in Register Project for building a registry without spawning terminals *(v0.13)*
 - **Auto-start safety** — entries with missing `cwd` are skipped with a single summary toast instead of N modal errors *(v0.13.1)*
 - **"Switch to auto sort"** — when in manual mode, right-click any tile to flip back to status-based sort *(v0.13.1)*
 - **Pinned tiles** — right-click → Pin tile to fix a terminal in a stable bottom zone regardless of `sortMode`. Useful for monitoring/infra tiles you want at known coordinates while urgent project tiles float to the top *(v0.13.4)*
