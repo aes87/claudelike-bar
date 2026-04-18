@@ -155,25 +155,29 @@ export function activate(context: vscode.ExtensionContext) {
   // rejected — autoplay blocked or decode failed), or 'timeout'. Used only
   // by the CI autoplay smoke test. Underscore prefix + not listed in
   // package.json contributes signals "do not use."
+  interface FirePlayResult { status: 'played' | 'error' | 'timeout'; reason?: string }
   const firePlayForTestCmd = vscode.commands.registerCommand(
     'claudeDashboard.__firePlayForTest',
-    (filename: string, volume = 0, timeoutMs = 5000): Promise<'played' | 'error' | 'timeout'> => {
+    (filename: string, volume = 0, timeoutMs = 5000): Promise<FirePlayResult> => {
       return new Promise((resolve) => {
         let settled = false;
-        const settle = (result: 'played' | 'error' | 'timeout') => {
+        const settle = (result: FirePlayResult) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
           sub.dispose();
           resolve(result);
         };
-        const timer = setTimeout(() => settle('timeout'), timeoutMs);
+        const timer = setTimeout(() => settle({ status: 'timeout' }), timeoutMs);
         const sub = provider.onAudioAck((ack) => {
           // Match by filename so an unrelated in-flight play doesn't
           // resolve this call (test runs in isolation so this is belt-
           // and-braces, but cheap).
           if (!ack.url.endsWith(`/${filename}`)) return;
-          settle(ack.type === 'played' ? 'played' : 'error');
+          settle({
+            status: ack.type === 'played' ? 'played' : 'error',
+            reason: ack.reason,
+          });
         });
         provider.postPlay(filename, volume);
       });
