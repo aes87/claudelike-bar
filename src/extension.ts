@@ -14,6 +14,7 @@ import {
 import { executeRegisterProjectCommand } from './registerProject';
 import { executeLaunchProjectCommand, launchRegisteredProject, cwdExists } from './launchProject';
 import { showOnboardingNotification, isSetupComplete } from './onboarding';
+import { executeRemoveLegacyHooksCommand, maybePromptLegacyHookCleanup } from './legacyHooks';
 import { runSetupWizard } from './wizard';
 import { readExtensionVersion, soundsDir } from './claudePaths';
 import { ensureSoundsDirWithReadme } from './soundsReadme';
@@ -21,6 +22,7 @@ import * as path from 'path';
 
 const SETUP_PROMPTED_KEY = 'claudelike-bar.setupPrompted';
 const LAST_VERSION_KEY = 'claudelike-bar.lastVersion';
+const LEGACY_HOOKS_PROMPTED_KEY = 'claudelike-bar.legacyHooksPrompted';
 
 const STATUS_DIR = getStatusDir();
 const DEBUG_FLAG = path.join(STATUS_DIR, '.debug');
@@ -112,6 +114,10 @@ export function activate(context: vscode.ExtensionContext) {
     'claudeDashboard.showHooks',
     () => vscode.env.openExternal(vscode.Uri.parse(HOOKS_DOC_URL)),
   );
+  const removeLegacyHooksCmd = vscode.commands.registerCommand(
+    'claudeDashboard.removeLegacyHooks',
+    () => executeRemoveLegacyHooksCommand((m) => log(m)),
+  );
 
   // Refresh tiles on terminal changes. Declared early so audio commands
   // below can call it. The audioEnabled flag rides along so the webview
@@ -190,6 +196,13 @@ export function activate(context: vscode.ExtensionContext) {
       });
     },
   );
+
+  // v0.14 — one-shot check for pre-bar notify*.sh hook entries left over
+  // from custom setups. Offers cleanup if any are found. Gated on a
+  // dedicated globalState key so 'Don't ask again' persists across reloads.
+  // Fire-and-forget — never blocks activation.
+  maybePromptLegacyHookCleanup(context, LEGACY_HOOKS_PROMPTED_KEY, (m) => log(m))
+    .catch((err) => log(`legacy-hooks prompt failed: ${err instanceof Error ? err.message : err}`));
 
   // First-activation onboarding: if hooks aren't installed AND we haven't
   // prompted before, show the install notification. Gate on globalState so
@@ -350,6 +363,7 @@ export function activate(context: vscode.ExtensionContext) {
     launchProjectCmd,
     setupProjectsCmd,
     showHooksCmd,
+    removeLegacyHooksCmd,
     toggleAudioCmd,
     openSoundsFolderCmd,
     firePlayForTestCmd,

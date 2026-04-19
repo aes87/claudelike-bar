@@ -114,6 +114,11 @@
         "category": "Claudelike Bar"
       },
       {
+        "command": "claudeDashboard.removeLegacyHooks",
+        "title": "Remove Legacy Hooks (notify.sh / notify-silent.sh)",
+        "category": "Claudelike Bar"
+      },
+      {
         "command": "claudeDashboard.toggleAudio",
         "title": "Toggle Audio",
         "category": "Claudelike Bar"
