@@ -83,6 +83,7 @@
       scroll-behavior: auto; /* Lenis handles */
       -webkit-font-smoothing: antialiased;
       -moz-osx-font-smoothing: grayscale;
+      overflow-x: clip;
     }
 
     body {
@@ -172,6 +173,12 @@
       0%   { d: path("M300,87.68 C405.44,84.57 424.47,94.87 484.72,193.35 C544.97,291.83 556.24,334.33 500.82,415.94 C445.4,497.55 420.82,465.18 300,465.37 C179.18,465.56 148.12,495.06 98.09,416.57 C48.07,338.08 72.68,302.4 133.25,203.73 C193.82,105.06 194.56,90.79 300,87.68"); }
       50%  { d: path("M300,66.97 C395.05,71.06 403.16,120.37 446.6,215.36 C490.04,310.35 488.77,310.3 444.79,383.59 C400.81,456.88 392.01,456.69 300,459.65 C207.99,462.61 189.17,470.85 138.1,393.47 C87.03,316.09 81.21,299.67 129.78,201.72 C178.35,103.77 204.95,62.88 300,66.97"); }
       100% { d: path("M300,85.64 C406.49,95.34 397.64,119.44 449.5,213.69 C501.36,307.94 517.72,306.86 472.87,399.8 C428.02,492.74 395.5,528.24 300,523.49 C204.5,518.74 216.19,486.62 154.55,383.98 C92.91,281.34 50.9,270.87 94.53,181.37 C138.17,91.87 193.51,75.94 300,85.64"); }
+    }
+    @media (max-width: 768px) {
+      .morphing-blobs svg { width: 250%; height: 100%; margin-left: -75%; }
+      .morphing-blobs__blob--0 { opacity: 0.3; filter: blur(60px); }
+      .morphing-blobs__blob--1 { opacity: 0.22; filter: blur(70px); }
+      .morphing-blobs__blob--2 { opacity: 0.18; filter: blur(80px); }
     }
 
     /* -------- Nav -------- */
@@ -670,12 +677,18 @@
     }
 
     @media (max-width: 640px) {
-      .changelog { padding-left: var(--space-2xl); }
+      .changelog { padding-left: var(--space-xl); }
       .changelog__marker {
-        left: calc(-1 * var(--space-2xl) + 4px);
+        left: calc(-1 * var(--space-xl) + 4px);
         width: 24px; height: 24px;
       }
-      .changelog::before { left: 15px; }
+      .changelog::before { left: 11px; }
+      .turn, .bubble { min-width: 0; }
+      .bubble .diff {
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-x: visible;
+      }
     }
 
     /* -------- Chat section -------- */
