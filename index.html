@@ -992,51 +992,46 @@
         <header class="section__header">
           <p class="section__overline">Features over time</p>
           <h2 class="section__heading" id="changelog-heading">Fifteen days, thirteen versions.</h2>
-          <p class="section__description">First commit went up on April 4, 2026. This is where the bar has traveled since, newest first.</p>
+          <p class="section__description">First commit went up on April 4, 2026. This is where the bar has traveled since — from first push to now.</p>
         </header>
 
         <ol class="changelog">
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.13</span></div>
-            <h3>Remote hosts, pinned tiles, launch on demand <span class="version-tag">Apr 18 · Day 15</span></h3>
-            <p>Six patches in one afternoon. The bar now works on every host VS Code can reach, with tile zones for stability and a rocket for on-demand launches.</p>
+            <div class="changelog__marker"><span>0.1–0.2</span></div>
+            <h3>First push <span class="version-tag">Apr 4 · Day 1</span></h3>
+            <p>Initial sidebar dashboard for Claude Code terminals went up in the afternoon. Before the day was over, v0.2 landed: DOM diffing instead of full re-renders, context % in the statusline, sticky waiting tiles, thicker left borders. The live preview page went up the same evening.</p>
+          </li>
+
+          <li class="changelog__entry">
+            <div class="changelog__marker"><span>0.3–0.5</span></div>
+            <h3>Named, configured, set up <span class="version-tag">Apr 5–10 · Days 2–7</span></h3>
             <ul>
-              <li><strong>Launch Registered Project</strong> (v0.13.0) — rocket icon in the header, palette command, and tile right-click menu all QuickPick any registered project that isn't currently open.</li>
-              <li><strong>Auto-sort toggle &amp; cwd pre-flight</strong> (v0.13.1) — one-click flip back to auto after dragging; <code>fs.existsSync</code> skips missing auto-start paths with a single toast instead of stacking modals.</li>
-              <li><strong>Custom color picker</strong> (v0.13.2) — rainbow <code>&lt;input type="color"&gt;</code> in the swatch row flows any hex through the same setColor handler.</li>
-              <li><strong>Remote everywhere</strong> (v0.13.3) — <code>extensionKind: ["workspace", "ui"]</code> so WSL2, SSH, Dev Containers, and Codespaces all register hooks to the right <code>~/.claude/</code>.</li>
-              <li><strong>Pinned &amp; offline tiles</strong> (v0.13.4) — pin a tile to a stable bottom zone; registered-but-not-open projects show as dim click-to-launch tiles.</li>
-              <li><strong>Hotfix</strong> (v0.13.5) — webview.js parse error introduced by v0.13.4.</li>
+              <li><strong>v0.3.1</strong> — renamed from the generic "dashboard" to <em>Claudelike Bar</em>; ID-based identity; the first right-click menu.</li>
+              <li><strong>v0.4.0</strong> — real config file, per-terminal nicknames, auto-start, hooks shipped with the extension.</li>
+              <li><strong>v0.5.1</strong> — one-command setup script, JSONC config with comments, comprehensive docs. <em>"Point Claude at it"</em> became the first install option.</li>
+              <li><strong>v0.5.2</strong> — esbuild bundling fix for <code>jsonc-parser</code>.</li>
             </ul>
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.12</span></div>
-            <h3>Audio alerts <span class="version-tag">Apr 18 · Day 15</span></h3>
-            <p>Optional chime when Claude is waiting. Two slots — end-of-turn (<code>Stop</code>) and mid-job permission prompts (<code>Notification</code>) — so you can tell <em>done</em> apart from <em>blocked on approval</em> by ear. Off by default; BYO sound files to <code>~/.claude/sounds/</code>, right-click to mute per-tile.</p>
-          </li>
-
-          <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.11</span></div>
-            <h3>First-run experience <span class="version-tag">Apr 16 · Day 13</span></h3>
-            <p>The extension stopped assuming you'd edit JSONC by hand.</p>
+            <div class="changelog__marker"><span>0.7</span></div>
+            <h3>Drag, drop, done <span class="version-tag">Apr 11–12 · Days 8–9</span></h3>
+            <p>The version where the interaction model clicked.</p>
             <ul>
-              <li><strong>Setup wizard</strong> (v0.11.0) — 5-step QuickPick: pick folders, confirm names, assign colors, choose startup command, review.</li>
-              <li><strong>Sidebar <code>+</code>, walkthrough, hook path index</strong> (v0.11.1) — VS Code's native walkthrough API; one-click Register Project; <code>~/.claude/claudelike-bar-paths.json</code> so manually-opened terminals resolve via cwd.</li>
-              <li><strong>Upgrade notification + "Start fresh"</strong> (v0.11.2) — re-run the wizard cleanly after an update.</li>
-              <li><strong>Custom CSS colors</strong> (v0.11.4) — any <code>#hex</code>, <code>rgb()</code>, <code>hsl()</code>, or <code>var(--anything)</code> per-terminal.</li>
-              <li><strong>Instant-open Register Project</strong> (v0.11.5) — flow ends with <em>Open terminal now / Register only</em>. Build a 15-project registry without spawning 15 terminals.</li>
+              <li><strong>v0.7.1</strong> — per-terminal <code>command</code> override, drag/drop reorder, <em>mark as done</em>, explicit <code>sortMode</code> auto/manual, state-machine fixes.</li>
+              <li><strong>v0.7.2–.6</strong> — post-review polish, ignored-state bug fix, debug-log docs, public-use rename sweep, Open VSX listing metadata.</li>
+              <li><strong>Tests &amp; CI</strong> — vitest suite and a 3-OS GitHub Actions matrix (Ubuntu / macOS / Windows).</li>
             </ul>
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.10</span></div>
-            <h3>Path identity, global config <span class="version-tag">Apr 16 · Day 13</span></h3>
-            <p>Two evenings of refactoring that reshaped how projects are keyed and where config lives.</p>
+            <div class="changelog__marker"><span>0.8</span></div>
+            <h3>Ready for the Marketplace <span class="version-tag">Apr 13–14 · Days 10–11</span></h3>
             <ul>
-              <li><strong>Path-based identity</strong> (v0.10.0) — projects keyed by absolute <code>path</code>, not basename. Two <code>api</code> folders in different trees get distinct collision-resistant slugs.</li>
-              <li><strong>Global config at <code>~/.claude/</code></strong> (v0.10.1) — one <code>claudelike-bar.jsonc</code> across every VS Code window, next to your hooks and settings. Workspace-local configs auto-migrate on first load.</li>
+              <li><strong>v0.8.0</strong> — hook rewritten in Node.js with <code>os.tmpdir()</code> and 3-tier matching (terminal name → path → basename) so it works identically on Windows, macOS, and Linux.</li>
+              <li><strong>v0.8.1</strong> — marketplace-ready install flow: single VSIX, onboarding modal, explainer screen.</li>
+              <li><strong>v0.8.2</strong> — standalone statusline module so context % no longer depends on the full extension.</li>
             </ul>
           </li>
 
@@ -1053,41 +1048,46 @@
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.8</span></div>
-            <h3>Ready for the Marketplace <span class="version-tag">Apr 13–14 · Days 10–11</span></h3>
+            <div class="changelog__marker"><span>0.10</span></div>
+            <h3>Path identity, global config <span class="version-tag">Apr 16 · Day 13</span></h3>
+            <p>Two evenings of refactoring that reshaped how projects are keyed and where config lives.</p>
             <ul>
-              <li><strong>v0.8.0</strong> — hook rewritten in Node.js with <code>os.tmpdir()</code> and 3-tier matching (terminal name → path → basename) so it works identically on Windows, macOS, and Linux.</li>
-              <li><strong>v0.8.1</strong> — marketplace-ready install flow: single VSIX, onboarding modal, explainer screen.</li>
-              <li><strong>v0.8.2</strong> — standalone statusline module so context % no longer depends on the full extension.</li>
+              <li><strong>Path-based identity</strong> (v0.10.0) — projects keyed by absolute <code>path</code>, not basename. Two <code>api</code> folders in different trees get distinct collision-resistant slugs.</li>
+              <li><strong>Global config at <code>~/.claude/</code></strong> (v0.10.1) — one <code>claudelike-bar.jsonc</code> across every VS Code window, next to your hooks and settings. Workspace-local configs auto-migrate on first load.</li>
             </ul>
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.7</span></div>
-            <h3>Drag, drop, done <span class="version-tag">Apr 11–12 · Days 8–9</span></h3>
-            <p>The version where the interaction model clicked.</p>
+            <div class="changelog__marker"><span>0.11</span></div>
+            <h3>First-run experience <span class="version-tag">Apr 16 · Day 13</span></h3>
+            <p>The extension stopped assuming you'd edit JSONC by hand.</p>
             <ul>
-              <li><strong>v0.7.1</strong> — per-terminal <code>command</code> override, drag/drop reorder, <em>mark as done</em>, explicit <code>sortMode</code> auto/manual, state-machine fixes.</li>
-              <li><strong>v0.7.2–.6</strong> — post-review polish, ignored-state bug fix, debug-log docs, public-use rename sweep, Open VSX listing metadata.</li>
-              <li><strong>Tests &amp; CI</strong> — vitest suite and a 3-OS GitHub Actions matrix (Ubuntu / macOS / Windows).</li>
+              <li><strong>Setup wizard</strong> (v0.11.0) — 5-step QuickPick: pick folders, confirm names, assign colors, choose startup command, review.</li>
+              <li><strong>Sidebar <code>+</code>, walkthrough, hook path index</strong> (v0.11.1) — VS Code's native walkthrough API; one-click Register Project; <code>~/.claude/claudelike-bar-paths.json</code> so manually-opened terminals resolve via cwd.</li>
+              <li><strong>Upgrade notification + "Start fresh"</strong> (v0.11.2) — re-run the wizard cleanly after an update.</li>
+              <li><strong>Custom CSS colors</strong> (v0.11.4) — any <code>#hex</code>, <code>rgb()</code>, <code>hsl()</code>, or <code>var(--anything)</code> per-terminal.</li>
+              <li><strong>Instant-open Register Project</strong> (v0.11.5) — flow ends with <em>Open terminal now / Register only</em>. Build a 15-project registry without spawning 15 terminals.</li>
             </ul>
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.3–0.5</span></div>
-            <h3>Named, configured, set up <span class="version-tag">Apr 5–10 · Days 2–7</span></h3>
-            <ul>
-              <li><strong>v0.3.1</strong> — renamed from the generic "dashboard" to <em>Claudelike Bar</em>; ID-based identity; the first right-click menu.</li>
-              <li><strong>v0.4.0</strong> — real config file, per-terminal nicknames, auto-start, hooks shipped with the extension.</li>
-              <li><strong>v0.5.1</strong> — one-command setup script, JSONC config with comments, comprehensive docs. <em>"Point Claude at it"</em> became the first install option.</li>
-              <li><strong>v0.5.2</strong> — esbuild bundling fix for <code>jsonc-parser</code>.</li>
-            </ul>
+            <div class="changelog__marker"><span>0.12</span></div>
+            <h3>Audio alerts <span class="version-tag">Apr 18 · Day 15</span></h3>
+            <p>Optional chime when Claude is waiting. Two slots — end-of-turn (<code>Stop</code>) and mid-job permission prompts (<code>Notification</code>) — so you can tell <em>done</em> apart from <em>blocked on approval</em> by ear. Off by default; BYO sound files to <code>~/.claude/sounds/</code>, right-click to mute per-tile.</p>
           </li>
 
           <li class="changelog__entry">
-            <div class="changelog__marker"><span>0.1–0.2</span></div>
-            <h3>First push <span class="version-tag">Apr 4 · Day 1</span></h3>
-            <p>Initial sidebar dashboard for Claude Code terminals went up in the afternoon. Before the day was over, v0.2 landed: DOM diffing instead of full re-renders, context % in the statusline, sticky waiting tiles, thicker left borders. The live preview page went up the same evening.</p>
+            <div class="changelog__marker"><span>0.13</span></div>
+            <h3>Remote hosts, pinned tiles, launch on demand <span class="version-tag">Apr 18 · Day 15</span></h3>
+            <p>Six patches in one afternoon. The bar now works on every host VS Code can reach, with tile zones for stability and a rocket for on-demand launches.</p>
+            <ul>
+              <li><strong>Launch Registered Project</strong> (v0.13.0) — rocket icon in the header, palette command, and tile right-click menu all QuickPick any registered project that isn't currently open.</li>
+              <li><strong>Auto-sort toggle &amp; cwd pre-flight</strong> (v0.13.1) — one-click flip back to auto after dragging; <code>fs.existsSync</code> skips missing auto-start paths with a single toast instead of stacking modals.</li>
+              <li><strong>Custom color picker</strong> (v0.13.2) — rainbow <code>&lt;input type="color"&gt;</code> in the swatch row flows any hex through the same setColor handler.</li>
+              <li><strong>Remote everywhere</strong> (v0.13.3) — <code>extensionKind: ["workspace", "ui"]</code> so WSL2, SSH, Dev Containers, and Codespaces all register hooks to the right <code>~/.claude/</code>.</li>
+              <li><strong>Pinned &amp; offline tiles</strong> (v0.13.4) — pin a tile to a stable bottom zone; registered-but-not-open projects show as dim click-to-launch tiles.</li>
+              <li><strong>Hotfix</strong> (v0.13.5) — webview.js parse error introduced by v0.13.4.</li>
+            </ul>
           </li>
 
         </ol>
