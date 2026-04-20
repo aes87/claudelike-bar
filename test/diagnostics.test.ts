@@ -12,6 +12,7 @@ import { ConfigManager } from '../src/configManager';
  */
 
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 let tmpHome: string;
 let tmpWorkspace: string;
 let bundledDir: string;
@@ -19,10 +20,14 @@ let configPath: string;
 
 beforeEach(() => {
   originalHome = process.env.HOME;
+  originalUserProfile = process.env.USERPROFILE;
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'diag-home-'));
   tmpWorkspace = fs.mkdtempSync(path.join(os.tmpdir(), 'diag-ws-'));
   bundledDir = fs.mkdtempSync(path.join(os.tmpdir(), 'diag-bundled-'));
+  // Node's os.homedir() reads USERPROFILE on Windows, HOME on *nix.
+  // Set both so the redirect works on every CI target.
   process.env.HOME = tmpHome;
+  process.env.USERPROFILE = tmpHome;
   configPath = path.join(tmpWorkspace, 'claudelike-bar.jsonc');
   fs.mkdirSync(path.join(tmpHome, '.claude', 'hooks'), { recursive: true });
 });
@@ -30,6 +35,8 @@ beforeEach(() => {
 afterEach(() => {
   if (originalHome !== undefined) process.env.HOME = originalHome;
   else delete process.env.HOME;
+  if (originalUserProfile !== undefined) process.env.USERPROFILE = originalUserProfile;
+  else delete process.env.USERPROFILE;
   fs.rmSync(tmpHome, { recursive: true, force: true });
   fs.rmSync(tmpWorkspace, { recursive: true, force: true });
   fs.rmSync(bundledDir, { recursive: true, force: true });

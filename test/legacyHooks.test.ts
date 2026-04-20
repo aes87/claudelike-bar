@@ -12,6 +12,7 @@ import { detectLegacyHooks, removeLegacyHooks } from '../src/legacyHooks';
  */
 
 let originalHome: string | undefined;
+let originalUserProfile: string | undefined;
 let tmpHome: string;
 
 function settingsFilePath(): string {
@@ -29,13 +30,19 @@ function readSettings(): any {
 
 beforeEach(() => {
   originalHome = process.env.HOME;
+  originalUserProfile = process.env.USERPROFILE;
   tmpHome = fs.mkdtempSync(path.join(os.tmpdir(), 'legacy-hooks-'));
+  // Node's os.homedir() reads USERPROFILE on Windows, HOME on *nix.
+  // Set both so the redirect works on every CI target.
   process.env.HOME = tmpHome;
+  process.env.USERPROFILE = tmpHome;
 });
 
 afterEach(() => {
   if (originalHome !== undefined) process.env.HOME = originalHome;
   else delete process.env.HOME;
+  if (originalUserProfile !== undefined) process.env.USERPROFILE = originalUserProfile;
+  else delete process.env.USERPROFILE;
   fs.rmSync(tmpHome, { recursive: true, force: true });
 });
 
