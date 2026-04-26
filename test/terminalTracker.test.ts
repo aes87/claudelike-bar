@@ -367,6 +367,57 @@ describe('TerminalTracker v0.9 — multi-agent state', () => {
     expect(getTile()?.pendingSubagents).toBe(0);
   });
 
+  it('getTiles() promotes working+subagentPermissionPending to ready (#23)', () => {
+    // Subagent is asking for user permission mid-job — the underlying state
+    // is `working` but the user functionally needs to act on it. getTiles()
+    // should project status to `ready` so the dot color and sort order both
+    // reflect "needs attention" rather than "Claude is busy."
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+    tracker.updateStatus('my-project', 'ready', 'Notification', undefined, {
+      notification_type: 'permission_prompt',
+    });
+    // Internal state machine still tracks it as working (transitions depend on it).
+    // We can't observe internal status directly via getTiles() now — but the
+    // flag should still be set.
+    const projected = getTile();
+    expect(projected?.status).toBe('ready');
+    expect(projected?.subagentPermissionPending).toBe(true);
+  });
+
+  it('getTiles() does NOT promote when subagentPermissionPending is false (#23 control)', () => {
+    // Plain working tile with subagents but no permission flag — should stay working.
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+    expect(getTile()?.status).toBe('working');
+    expect(getTile()?.subagentPermissionPending).toBe(false);
+  });
+
+  it('subagent permission tile sorts above plain working tiles (#23)', () => {
+    // Auto sort treats `ready` as priority 3 and `working` as priority 4 —
+    // promoting subagent-pending tiles to `ready` means they float above
+    // peers that are just busy.
+    addMockTerminal('peer-busy');
+    addMockTerminal('peer-ready-true');
+    // Re-construct tracker so it picks up the new terminals.
+    tracker.dispose();
+    tracker = new TerminalTracker(config);
+
+    tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+    tracker.updateStatus('my-project', 'ready', 'Notification', undefined, {
+      notification_type: 'permission_prompt',
+    });
+    tracker.updateStatus('peer-busy', 'working', 'UserPromptSubmit');
+    tracker.updateStatus('peer-ready-true', 'ready', 'Stop');
+
+    const order = tracker.getTiles().map((t) => t.name);
+    // Both ready-equivalent tiles ahead of plain working; their order between
+    // themselves depends on lastActivity but both must precede peer-busy.
+    expect(order.indexOf('my-project')).toBeLessThan(order.indexOf('peer-busy'));
+    expect(order.indexOf('peer-ready-true')).toBeLessThan(order.indexOf('peer-busy'));
+  });
+
   it('Stop zeros subagentPermissionPending alongside the counter', () => {
     tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
     tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');

@@ -459,20 +459,25 @@ describe('v0.9.3 scenario: subagent permission prompt (F6)', () => {
 
   const tile = () => tracker.getTiles().find(t => t.name === 'my-project')!;
 
-  it('subagent running → permission_prompt surfaces as label override, status stays working', () => {
+  it('subagent running → permission_prompt surfaces as label override + ready projection', () => {
     tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
     tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
     expect(tile().status).toBe('working');
     expect(tile().pendingSubagents).toBe(1);
 
     // Subagent needs permission. Before F6 this notification was suppressed
-    // entirely (debug log only).
+    // entirely (debug log only). v0.15.4 (#23) — getTiles() now projects
+    // working+subagentPermissionPending to `ready` so the dot color and
+    // auto-sort priority both reflect "needs attention." The internal
+    // state machine still tracks `working` (subagent counter, transition
+    // logic) — the label and pendingSubagents values prove that.
     tracker.updateStatus('my-project', 'ready', 'Notification', undefined, {
       notification_type: 'permission_prompt',
     });
-    expect(tile().status).toBe('working'); // NOT ready — subagent still active
+    expect(tile().status).toBe('ready'); // projected from working
+    expect(tile().subagentPermissionPending).toBe(true);
     expect(tile().statusLabel.toLowerCase()).toContain('subagent needs permission');
-    expect(tile().pendingSubagents).toBe(1);
+    expect(tile().pendingSubagents).toBe(1); // counter intact = state machine still working internally
   });
 
   it('non-permission notifications during subagent work are still suppressed (not label-overridden)', () => {

@@ -917,7 +917,22 @@ export class TerminalTracker implements vscode.Disposable {
     // v0.13.4 (#4) — pinned tiles live in a fixed-position zone at the
     // bottom regardless of sortMode. Split, sort each group independently,
     // concat unpinned-first.
-    const all = Array.from(this.terminals.values());
+    //
+    // v0.15.4 (#23) — a tile in `working` with `subagentPermissionPending`
+    // is functionally awaiting user input on a subagent's permission prompt.
+    // For sort + render purposes promote it to `ready` so it floats to the
+    // top alongside primary Stop/Notification ready tiles and gets the
+    // amber attention dot instead of the green working pulse. The internal
+    // state machine still tracks it as `working` so transitions and
+    // clearing logic don't need to change. Cloning the TileData here means
+    // the override is render-only — the tracker's live tile state stays
+    // authoritative for the state machine.
+    const all = Array.from(this.terminals.values()).map((t) => {
+      if (t.status === 'working' && t.subagentPermissionPending) {
+        return { ...t, status: 'ready' as SessionStatus };
+      }
+      return t;
+    });
     const unpinned = all.filter((t) => !t.pinned);
     const pinned = all.filter((t) => t.pinned);
 
