@@ -152,6 +152,15 @@ export interface ConfigFile {
    * without waiting for a fresh submission).
    */
   showLastPrompt?: boolean;
+  /**
+   * v0.16.6 (#5) — when true, fire a VS Code information notification
+   * each time a tile transitions to ready (Stop / Notification) and the
+   * user isn't already looking at the terminal. Useful when VS Code is
+   * minimized or the user has Slack/browser focused. Off by default —
+   * many users prefer the existing audio alert path. Both can run side
+   * by side if both are enabled.
+   */
+  pushNotifications?: boolean;
   terminals: Record<string, TerminalConfig>;
 }
 
@@ -682,6 +691,10 @@ export class ConfigManager implements vscode.Disposable {
    */
   getShowLastPrompt(): boolean {
     return this.config.showLastPrompt === true;
+  }
+
+  getPushNotifications(): boolean {
+    return this.config.pushNotifications === true;
   }
 
   getShowRegisteredProjects(): boolean {

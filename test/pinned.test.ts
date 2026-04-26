@@ -566,6 +566,22 @@ describe('TerminalTracker — shell tiles (#25)', () => {
   });
 });
 
+describe('Push notifications (#5)', () => {
+  it('ConfigManager.getPushNotifications defaults to false', () => {
+    writeConfig({ terminals: {} });
+    const cm = new ConfigManager(CONFIG_PATH);
+    expect(cm.getPushNotifications()).toBe(false);
+    cm.dispose();
+  });
+
+  it('ConfigManager.getPushNotifications returns true when explicitly set', () => {
+    writeConfig({ pushNotifications: true, terminals: {} });
+    const cm = new ConfigManager(CONFIG_PATH);
+    expect(cm.getPushNotifications()).toBe(true);
+    cm.dispose();
+  });
+});
+
 describe('Last-prompt recall (#19)', () => {
   it('TerminalTracker.updateLastPrompt persists prompt + timestamp on the tile', () => {
     writeConfig({ terminals: { 'p': { color: 'cyan', icon: null, nickname: null, autoStart: false } } });

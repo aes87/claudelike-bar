@@ -468,6 +468,30 @@ export function activate(context: vscode.ExtensionContext) {
   // so its resetWarnings() can be called from the config-change callback.
   const audioPlayer = new AudioPlayer(tracker, configManager, provider, log);
 
+  // v0.16.6 (#5) — VS Code push notifications on transition to ready.
+  // Same gate as audio (transition into ready, not ready→ready, tile
+  // not focused), but routed to showInformationMessage with an "Open"
+  // action that surfaces the terminal. Independent of audio — both can
+  // run side by side. Subagent permission prompts (working +
+  // subagentPermissionPending) reach this code via the same StateTransition
+  // because getTiles() projection feeds onStateChange's `to` value.
+  const pushSub = tracker.onStateChange((t) => {
+    if (t.to !== 'ready' || t.from === 'ready') return;
+    if (t.isActive) return;
+    if (!configManager.getPushNotifications()) return;
+    const cfg = configManager.getTerminal(t.name);
+    const display = cfg?.nickname || t.name;
+    log(() => `push: notify ${t.name} (${t.event ?? '-'})`);
+    vscode.window.showInformationMessage(
+      `\u2713 ${display} — ready for input`,
+      'Open',
+    ).then((choice) => {
+      if (choice !== 'Open') return;
+      const term = tracker.getTerminalById(t.tileId);
+      if (term) term.show();
+    });
+  });
+
   // Refresh tiles when config file changes (color/nickname/mode edits).
   // The AudioPlayer's warn-once memory is also cleared so a file the user
   // just dropped in gets a fresh chance to be picked up.
@@ -515,6 +539,7 @@ export function activate(context: vscode.ExtensionContext) {
     configManager,
     configSub,
     audioPlayer,
+    pushSub,
     output,
     timerDisposable,
   );
