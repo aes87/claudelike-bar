@@ -132,7 +132,7 @@ export function activate(context: vscode.ExtensionContext) {
   // round-trip.
   const refreshTiles = () => {
     const tiles = tracker.getTiles();
-    provider.updateTiles(tiles, configManager.isAudioEnabled(), configManager.getSortMode());
+    provider.updateTiles(tiles, configManager.isAudioEnabled(), configManager.getSortMode(), configManager.getShowLastPrompt());
   };
 
   // v0.12 — audio commands.
@@ -353,6 +353,28 @@ export function activate(context: vscode.ExtensionContext) {
         break;
       }
 
+      case 'showLastPrompt': {
+        // v0.16.4 (#19) — full-text last-prompt readout. Tooltip on the
+        // tile shows a truncated version; this command surfaces the
+        // complete string (up to the hook's 300-char cap) in a copyable
+        // info message. No-op when the tile has no prompt yet.
+        const tile = tracker.getTiles().find((t) => t.id === message.id);
+        if (!tile?.lastPrompt) {
+          vscode.window.showInformationMessage(
+            `Claudelike Bar: no recorded prompt for "${tile?.displayName ?? '?'}". Submit a prompt in that terminal to capture one.`,
+          );
+          break;
+        }
+        const when = tile.lastPromptAt
+          ? new Date(tile.lastPromptAt * 1000).toLocaleTimeString()
+          : 'unknown';
+        vscode.window.showInformationMessage(
+          `${tile.displayName} — last prompt at ${when}:\n\n${tile.lastPrompt}`,
+          { modal: true },
+        );
+        break;
+      }
+
       case 'launchByName':
         // v0.13.4 (#15) — click on a registered (offline) tile launches
         // the project. Routes through the same shared helper as the
@@ -371,6 +393,13 @@ export function activate(context: vscode.ExtensionContext) {
       tracker.updateStatus(data.project, data.status, data.event, data.context_percent, data);
     } else if (data.context_percent !== undefined) {
       tracker.updateContext(data.project, data.context_percent);
+    }
+    // v0.16.4 (#19) — last user prompt is independent of state-machine
+    // transitions. The hook only writes last_prompt on UserPromptSubmit
+    // (it survives across other events via the read-merge-write), so the
+    // tracker only needs to update it when the field is actually present.
+    if (data.last_prompt && data.last_prompt_at) {
+      tracker.updateLastPrompt(data.project, data.last_prompt, data.last_prompt_at);
     }
   });
 

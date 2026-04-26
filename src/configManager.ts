@@ -142,6 +142,16 @@ export interface ConfigFile {
    * terminals, like prior versions.
    */
   showRegisteredProjects?: boolean;
+  /**
+   * v0.16.4 (#19) — when true, the bar shows a hover tooltip on each
+   * tile with the last user prompt submitted in that terminal, plus a
+   * "Show last prompt" right-click action. Default false because
+   * prompts can contain sensitive content; the user must opt in. The
+   * data still gets captured by the hook regardless of this flag (so
+   * flipping it on later surfaces the most recent prompt immediately
+   * without waiting for a fresh submission).
+   */
+  showLastPrompt?: boolean;
   terminals: Record<string, TerminalConfig>;
 }
 
@@ -670,6 +680,10 @@ export class ConfigManager implements vscode.Disposable {
    * Set false in the config to revert to the "running terminals only"
    * behavior of prior versions.
    */
+  getShowLastPrompt(): boolean {
+    return this.config.showLastPrompt === true;
+  }
+
   getShowRegisteredProjects(): boolean {
     return this.config.showRegisteredProjects !== false;
   }

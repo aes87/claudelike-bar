@@ -16,6 +16,11 @@ let audioEnabled = false;
 /** v0.13.1 — most recent sortMode from the extension host. Controls whether
  * the "Switch to auto sort" tile context-menu entry appears. */
 let sortMode = 'auto';
+/** v0.16.4 (#19) — when false, the bar suppresses last-prompt tooltips and
+ * the "Show last prompt" right-click item. Default off — prompts can
+ * contain sensitive content; the user must opt in via
+ * `showLastPrompt: true` in claudelike-bar.jsonc. */
+let showLastPrompt = false;
 
 // Handle messages from extension
 window.addEventListener('message', (event) => {
@@ -28,6 +33,9 @@ window.addEventListener('message', (event) => {
     }
     if (message.sortMode === 'auto' || message.sortMode === 'manual') {
       sortMode = message.sortMode;
+    }
+    if (typeof message.showLastPrompt === 'boolean') {
+      showLastPrompt = message.showLastPrompt;
     }
   } else if (message.type === 'play') {
     // v0.12 — play a sound via HTML5 audio. The extension has already
@@ -264,6 +272,18 @@ function patchTile(el, tile) {
   const ariaDisplayName = tile.displayName || tile.name;
   const label = tile.statusLabel || tile.status;
   el.setAttribute('aria-label', `${ariaDisplayName} — ${label}`);
+
+  // v0.16.4 (#19) — last-prompt tooltip via native title attribute.
+  // Gated on showLastPrompt config flag; cleared when off so a flip
+  // from on→off doesn't leave stale tooltips behind.
+  if (showLastPrompt && tile.lastPrompt) {
+    const truncated = tile.lastPrompt.length > 80
+      ? tile.lastPrompt.slice(0, 80) + '…'
+      : tile.lastPrompt;
+    el.setAttribute('title', `Last prompt:\n${truncated}`);
+  } else if (el.hasAttribute('title')) {
+    el.removeAttribute('title');
+  }
 }
 
 /**
@@ -316,6 +336,14 @@ function createTileEl(tile, index) {
   `;
 
   el.setAttribute('aria-label', `${displayName} — ${statusLabel}`);
+
+  // v0.16.4 (#19) — see patchTile for the gated tooltip rationale.
+  if (showLastPrompt && tile.lastPrompt) {
+    const truncated = tile.lastPrompt.length > 80
+      ? tile.lastPrompt.slice(0, 80) + '…'
+      : tile.lastPrompt;
+    el.setAttribute('title', `Last prompt:\n${truncated}`);
+  }
 
   el.addEventListener('click', () => {
     // Suppress click that immediately follows a drag
@@ -548,6 +576,18 @@ function showContextMenu(e, tileId) {
     vscode.postMessage({ type: 'renameTile', id: tileId });
   });
   menu.appendChild(renameItem);
+
+  // v0.16.4 (#19) — Show last prompt. Only Claude tiles can have a prompt
+  // (shell tiles never run Claude), and only when the feature is enabled
+  // in config. The handler in extension.ts guards against missing
+  // lastPrompt with an explanatory toast either way, but hiding the menu
+  // entry up front keeps the UI clean.
+  if (!isShell && showLastPrompt && tile?.lastPrompt) {
+    const promptItem = menuItem('\uD83D\uDCAC', 'Show last prompt', () => {
+      vscode.postMessage({ type: 'showLastPrompt', id: tileId });
+    });
+    menu.appendChild(promptItem);
+  }
 
   // Clone terminal
   const cloneItem = menuItem('\u2750', 'Clone terminal', () => {

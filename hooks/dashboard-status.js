@@ -70,6 +70,7 @@ function main() {
   let sessionSource = '';      // v0.9.1: SessionStart matcher
   let sessionEndReason = '';   // v0.9.1: SessionEnd matcher
   let compactionTrigger = '';  // v0.9.1: PreCompact/PostCompact matcher
+  let userPrompt = '';         // v0.16.4 (#19): UserPromptSubmit prompt text
   if (input) {
     try {
       const parsed = JSON.parse(input);
@@ -84,6 +85,14 @@ function main() {
       sessionSource = typeof parsed.source === 'string' ? parsed.source : '';
       sessionEndReason = typeof parsed.reason === 'string' ? parsed.reason : '';
       compactionTrigger = typeof parsed.compaction_trigger === 'string' ? parsed.compaction_trigger : '';
+      // v0.16.4 (#19) — capture the user prompt on UserPromptSubmit only.
+      // Truncate at the source (300 chars) so status JSONs stay small even
+      // for very long pasted prompts. Subagent prompts (agent_type set)
+      // are skipped — only parent-turn user input.
+      if (event === 'UserPromptSubmit' && !agentType) {
+        const raw = typeof parsed.prompt === 'string' ? parsed.prompt : '';
+        userPrompt = raw.length > 300 ? raw.slice(0, 300) + '…' : raw;
+      }
     } catch {
       // Malformed JSON — leave event/cwd empty, fall back below.
     }
@@ -175,6 +184,13 @@ function main() {
   ownFields.source = sessionSource;
   ownFields.reason = sessionEndReason;
   ownFields.compaction_trigger = compactionTrigger;
+  // v0.16.4 (#19) — only OVERWRITE last_prompt on UserPromptSubmit. On
+  // other events, leave it absent in ownFields so the read-merge-write
+  // below preserves the value the most recent UserPromptSubmit captured.
+  if (event === 'UserPromptSubmit' && userPrompt) {
+    ownFields.last_prompt = userPrompt;
+    ownFields.last_prompt_at = timestamp;
+  }
 
   let payload = ownFields;
   try {

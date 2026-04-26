@@ -962,6 +962,23 @@ export class TerminalTracker implements vscode.Disposable {
     this.onChangeEmitter.fire();
   }
 
+  /**
+   * v0.16.4 (#19) — capture the last user prompt for a tile. Independent
+   * of the state machine — no transitions, no label changes, just a
+   * persistent string + timestamp on the tile that the webview can
+   * surface as a hover tooltip and that the right-click "Show last
+   * prompt" command can read for the full text. Empty/undefined prompt
+   * is a no-op (preserves whatever was there from a prior submit).
+   */
+  updateLastPrompt(projectName: string, prompt: string, at: number): void {
+    if (!prompt) return;
+    const tile = this.findMatchingTile(projectName);
+    if (!tile) return;
+    tile.lastPrompt = prompt;
+    tile.lastPromptAt = at;
+    this.onChangeEmitter.fire();
+  }
+
   updateContext(projectName: string, contextPercent: number): void {
     const tile = this.findMatchingTile(projectName);
     if (tile) {

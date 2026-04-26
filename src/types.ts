@@ -65,6 +65,13 @@ export interface TileData {
   // focuses the terminal. Set via `type: "shell"` in claudelike-bar.jsonc.
   // Default (unset) = Claude tile, full state machine engaged.
   type?: 'claude' | 'shell';
+  // v0.16.4 (#19) — last user prompt and capture timestamp (unix seconds).
+  // Hook truncates to 300 chars at the source. Webview surfaces as a
+  // hover tooltip when `showLastPrompt` is true in config; right-click
+  // → "Show last prompt" shows the full text. Undefined when no prompt
+  // has been submitted yet for this tile.
+  lastPrompt?: string;
+  lastPromptAt?: number;
 }
 
 /**
@@ -97,6 +104,7 @@ export type WebviewMessage =
   | { type: 'setSortMode'; mode: 'auto' | 'manual' }
   | { type: 'setPinned'; id: number; pinned: boolean }
   | { type: 'renameTile'; id: number }
+  | { type: 'showLastPrompt'; id: number }
   | { type: 'launchByName'; name: string }
   // v0.12 — webview → extension acks after an audio play attempt. Only the
   // internal __firePlayForTest command consumes these; production code
@@ -157,6 +165,12 @@ export interface StatusFileData {
   source?: string;             // SessionStart matcher (startup/resume/clear/compact)
   reason?: string;             // SessionEnd matcher (logout/prompt_input_exit/...)
   compaction_trigger?: string; // PreCompact/PostCompact matcher (manual/auto)
+  // v0.16.4 (#19) — last user prompt (UserPromptSubmit). Captured only
+  // for parent-turn user input, not subagent fan-out. Hook truncates
+  // at 300 chars at the source. Survives other hook events via the
+  // status JSON read-merge-write.
+  last_prompt?: string;
+  last_prompt_at?: number;
 }
 
 export type ThemeGroup = 'cyan' | 'green' | 'blue' | 'magenta' | 'yellow' | 'white';

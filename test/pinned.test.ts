@@ -566,6 +566,62 @@ describe('TerminalTracker — shell tiles (#25)', () => {
   });
 });
 
+describe('Last-prompt recall (#19)', () => {
+  it('TerminalTracker.updateLastPrompt persists prompt + timestamp on the tile', () => {
+    writeConfig({ terminals: { 'p': { color: 'cyan', icon: null, nickname: null, autoStart: false } } });
+    addMockTerminal('p');
+    const cm = new ConfigManager(CONFIG_PATH);
+    const tracker = new TerminalTracker(cm);
+
+    tracker.updateLastPrompt('p', 'fix the race in terminalTracker', 1234567890);
+    const tile = tracker.getTiles().find((t) => t.name === 'p');
+    expect(tile?.lastPrompt).toBe('fix the race in terminalTracker');
+    expect(tile?.lastPromptAt).toBe(1234567890);
+
+    tracker.dispose();
+    cm.dispose();
+  });
+
+  it('updateLastPrompt is a no-op for empty prompt (preserves prior value)', () => {
+    writeConfig({ terminals: { 'p': { color: 'cyan', icon: null, nickname: null, autoStart: false } } });
+    addMockTerminal('p');
+    const cm = new ConfigManager(CONFIG_PATH);
+    const tracker = new TerminalTracker(cm);
+
+    tracker.updateLastPrompt('p', 'first prompt', 1000);
+    tracker.updateLastPrompt('p', '', 2000);
+    expect(tracker.getTiles().find((t) => t.name === 'p')?.lastPrompt).toBe('first prompt');
+
+    tracker.dispose();
+    cm.dispose();
+  });
+
+  it('updateLastPrompt no-ops when no tile matches the project name', () => {
+    writeConfig({ terminals: {} });
+    const cm = new ConfigManager(CONFIG_PATH);
+    const tracker = new TerminalTracker(cm);
+
+    expect(() => tracker.updateLastPrompt('nonexistent', 'whatever', 1)).not.toThrow();
+
+    tracker.dispose();
+    cm.dispose();
+  });
+
+  it('ConfigManager.getShowLastPrompt defaults to false (privacy opt-in)', () => {
+    writeConfig({ terminals: {} });
+    const cm = new ConfigManager(CONFIG_PATH);
+    expect(cm.getShowLastPrompt()).toBe(false);
+    cm.dispose();
+  });
+
+  it('ConfigManager.getShowLastPrompt returns true when explicitly set', () => {
+    writeConfig({ showLastPrompt: true, terminals: {} });
+    const cm = new ConfigManager(CONFIG_PATH);
+    expect(cm.getShowLastPrompt()).toBe(true);
+    cm.dispose();
+  });
+});
+
 describe('Rename tile (#11)', () => {
   it('ConfigManager.setRenameOverride writes nickname + projectName', () => {
     writeConfig({
