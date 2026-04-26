@@ -1229,7 +1229,7 @@
       <div class="hero__content">
         <div class="hero__text">
           <img class="hero__app-icon" src="media/icon.png" alt="Claudelike Bar app icon — three horizontal stripes (cyan, teal, pink) with status dots, in a rounded square" width="88" height="88">
-          <p class="hero__overline">VS Code Extension <span class="version">v0.16.6</span></p>
+          <p class="hero__overline">VS Code Extension <span class="version">v0.16.7</span></p>
           <h1 class="hero__headline" data-split="words">Live status tiles for every <em>Claude Code</em> terminal.</h1>
           <p class="hero__subhead">A sidebar that shows what every Claude is doing at a glance — animated dots, color-coded borders, drag-to-reorder, context-window tracking, and a passive-aggressive mode that guilt-trips you when you ignore it.</p>
           <div class="hero__cta">
@@ -1526,6 +1526,7 @@
               <li><strong>Last-prompt recall</strong> (v0.16.4, #19) — flip <code>"showLastPrompt": true</code> in your config and the bar surfaces the last user prompt you sent in each terminal. Hover the tile for a tooltip preview (truncated to 80 chars); right-click → <em>Show last prompt</em> for the full text in a modal. The hook captures via <code>UserPromptSubmit</code>, truncates at 300 chars at the source, and only on parent-turn input — subagent fan-out is excluded. Off by default since prompts can contain sensitive content.</li>
               <li><strong>Hotkey bindings</strong> (v0.16.5, #18) — ten commands ready for binding in your own <code>keybindings.json</code>: <code>focusSlot1</code>…<code>focusSlot9</code> jump to the Nth live tile in current sort, and <code>focusByName</code> takes a tile name via <code>args</code> for stable per-project bindings. Slot bindings follow the slot (auto-sort surfaces urgent tiles); forced bindings always land on the named tile.</li>
               <li><strong>Push notifications when work completes</strong> (v0.16.6, #5) — flip <code>"pushNotifications": true</code> and the bar fires a VS Code information notification (<code>✓ &lt;tile&gt; — ready for input</code>) when a non-focused tile hits ready. Includes an <em>Open</em> action that focuses the terminal. Skips when the tile is currently focused — no self-pinging. Independent of the audio alert path; both can run side by side.</li>
+              <li><strong>Workspace-scoped auto-start</strong> (v0.16.7, #9) — auto-start now only spawns terminals whose <code>path</code> lives under one of the current workspace folders. A user with 15 projects across 3 windows used to get all 15 terminals on every activation; now each window starts only what belongs there. Entries with no <code>path</code> still auto-start (no scope to apply). Empty windows (no folders open) fall through to the legacy unfiltered behavior.</li>
             </ul>
           </li>
 

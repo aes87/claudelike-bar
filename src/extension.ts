@@ -6,6 +6,7 @@ import { StatusWatcher } from './statusWatcher';
 import { ConfigManager } from './configManager';
 import { AudioPlayer } from './audio';
 import { getStatusDir } from './statusDir';
+import { isPathUnder } from './workspaceScope';
 import { executeHooksInstallCommand, HOOKS_DOC_URL } from './setup';
 import {
   executeStatuslineInstallCommand,
@@ -582,7 +583,31 @@ function runAutoStart(
   tracker: TerminalTracker,
   log: LogFn,
 ): void {
-  const autoStartNames = configManager.getAutoStartTerminals();
+  const allAutoStart = configManager.getAutoStartTerminals();
+
+  // v0.16.7 (#9) — workspace-scoped auto-start. With a single global
+  // config at ~/.claude/claudelike-bar.jsonc, every workspace would
+  // previously spawn every autoStart entry on activation. Filter to
+  // entries whose `path` lives under one of the current workspace
+  // folders. Entries with no `path` are also kept (no scope to apply).
+  // When VS Code is opened with no workspaceFolders at all (single
+  // empty window), fall through to the unfiltered list — there's no
+  // scope to apply and the user would otherwise get nothing.
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  const folderPaths = folders.map((f) => f.uri.fsPath);
+  const autoStartNames = folderPaths.length === 0
+    ? allAutoStart
+    : allAutoStart.filter((name) => {
+        const cfg = configManager.getTerminal(name);
+        const projectPath = cfg?.path;
+        if (!projectPath) return true; // no path = no scope check possible
+        return folderPaths.some((root) => isPathUnder(projectPath, root));
+      });
+
+  const filteredOut = allAutoStart.length - autoStartNames.length;
+  if (filteredOut > 0) {
+    log(`auto-start: ${filteredOut} entr${filteredOut === 1 ? 'y' : 'ies'} filtered out (path not under workspace folders ${folderPaths.join(', ')})`);
+  }
   log(`auto-starting ${autoStartNames.length} terminal(s): ${autoStartNames.join(', ')}`);
 
   // v0.13.1 (#13) — pre-check cwds so we can surface ONE friendly toast
