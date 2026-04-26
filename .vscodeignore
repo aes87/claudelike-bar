@@ -19,3 +19,5 @@ vitest.config.ts
 .vscode-test/**
 docs/sessions/**
 docs/launch-strategy.md
+public/**
+wrangler.jsonc
