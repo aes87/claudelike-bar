@@ -1,8 +1,8 @@
 # Install guide
 
-> **VS Code Marketplace:** temporarily unavailable — waiting for Microsoft. Use Open VSX in the meantime (works in vanilla VS Code too).
-
 Three install paths. Pick one.
+
+> **Slug split between registries.** Marketplace ID is `harteWired.claudelikebar` (no hyphen); Open VSX ID is `harteWired.claudelike-bar` (with hyphen). Microsoft permanently reserved the hyphenated name after a rebrand fumble — same extension, two slugs. Use the one that matches whichever registry you install from.
 
 ## Prerequisites
 
@@ -14,7 +14,9 @@ No `jq`, no bash, no special tools.
 
 ## Fast path (recommended)
 
-1. Install from [Open VSX](https://open-vsx.org/extension/harteWired/claudelike-bar) — or any VS Code-compatible marketplace.
+1. Install from your editor's extension panel:
+   - **Vanilla VS Code:** [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=harteWired.claudelikebar) — search "Claudelike-Bar".
+   - **VSCodium / Cursor / forks:** [Open VSX](https://open-vsx.org/extension/harteWired/claudelike-bar) — search "Claudelike Bar".
 2. Open VS Code — a notification prompts: **"Claudelike Bar needs hooks to track terminal status. Set up your projects now?"**
 3. Click **Set Up Projects** to run the wizard, or **Install Hooks Only** for a minimal start.
 
@@ -24,12 +26,17 @@ You can also trigger install manually: `Cmd+Shift+P` → **Claudelike Bar: Insta
 
 ## Dev Containers / Codespaces
 
-Listing `harteWired.claudelike-bar` in your `devcontainer.json` under `customizations.vscode.extensions` only works when VS Code's extension gallery is Open VSX (VSCodium, Cursor, and forks). **Vanilla VS Code defaults to the Microsoft Marketplace**, which doesn't have this extension, and the install silently fails — the sidebar just doesn't appear, and there's no error in the build log.
+Pick the right extension ID for your editor's gallery:
 
-Self-heal by dropping this into your container's `postAttachCommand` (or any script that runs on attach). Idempotent — re-running is a no-op when the extension is already installed, so the same line works across rebuilds:
+- **Vanilla VS Code** (Microsoft Marketplace): `harteWired.claudelikebar`
+- **VSCodium / Cursor / forks** (Open VSX): `harteWired.claudelike-bar`
+
+Drop the matching ID into `customizations.vscode.extensions` in `devcontainer.json` and the gallery handles install on attach.
+
+If you want belt-and-suspenders self-heal — for example, environments where the gallery install silently fails — add this to your container's `postAttachCommand`. Idempotent across rebuilds; matches either slug:
 
 ```bash
-if ! code --list-extensions 2>/dev/null | grep -q harteWired.claudelike-bar; then
+if ! code --list-extensions 2>/dev/null | grep -qE 'harteWired\.claudelike-?bar'; then
   curl -sL https://github.com/aes87/claudelike-bar/releases/latest/download/claudelike-bar.vsix \
     -o /tmp/clb.vsix \
     && code --install-extension /tmp/clb.vsix

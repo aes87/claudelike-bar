@@ -112,8 +112,9 @@ If the bar breaks after a rebuild, check activation errors first (see Verify sec
 
 ```bash
 # Extension activated without errors?
-# Look for "harteWired.claudelike-bar" — should say "activated" not "failed"
-grep -A2 "claudelike-bar" ~/.vscode-server/data/logs/*/exthost*/remoteexthost.log
+# Look for "harteWired.claudelikebar" (Marketplace) or "harteWired.claudelike-bar" (Open VSX)
+# — should say "activated" not "failed"
+grep -EA2 'claudelike-?bar' ~/.vscode-server/data/logs/*/exthost*/remoteexthost.log
 
 # Hooks registered for all 4 events?
 grep dashboard-status ~/.claude/settings.json

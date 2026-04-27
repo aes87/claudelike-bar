@@ -4,6 +4,7 @@
 
 # claudelike-bar
 
+[![VS Code Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/harteWired.claudelikebar?label=VS%20Code%20Marketplace&color=1e1e2e)](https://marketplace.visualstudio.com/items?itemName=harteWired.claudelikebar)
 [![Open VSX Version](https://img.shields.io/open-vsx/v/harteWired/claudelike-bar?label=Open%20VSX&color=1e1e2e)](https://open-vsx.org/extension/harteWired/claudelike-bar)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -31,9 +32,10 @@ A VS Code sidebar that shows you — at a glance — what every Claude Code term
 
 ## Install
 
-> **VS Code Marketplace:** temporarily unavailable — waiting for Microsoft. Use Open VSX in the meantime.
+- **[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=harteWired.claudelikebar)** — vanilla VS Code. Search "Claudelike-Bar" in the Extensions panel, or run `code --install-extension harteWired.claudelikebar`.
+- **[Open VSX](https://open-vsx.org/extension/harteWired/claudelike-bar)** — VSCodium, Cursor, most Dev Containers / Codespaces.
 
-- **[Open VSX](https://open-vsx.org/extension/harteWired/claudelike-bar)** — VSCodium, Cursor, most Dev Containers / Codespaces, and vanilla VS Code (via `code --install-extension https://open-vsx.org/api/harteWired/claudelike-bar/latest/file/harteWired.claudelike-bar-latest.vsix`).
+> **Heads up — slug split.** Marketplace ID is `harteWired.claudelikebar` (no hyphen); Open VSX ID is `harteWired.claudelike-bar` (with hyphen). Microsoft permanently reserved the original hyphenated name after a rebrand fumble. The two listings are the same extension.
 
 After install:
 

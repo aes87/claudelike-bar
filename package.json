@@ -1,9 +1,9 @@
 {
-  "name": "claudelike-bar",
-  "displayName": "Claudelike Bar",
+  "name": "claudelikebar",
+  "displayName": "Claudelike-Bar",
   "description": "Live sidebar for Claude Code terminals — see what every session is doing at a glance without tab-switching.",
-  "version": "0.16.7",
-  "publisher": "aes87",
+  "version": "0.17.0",
+  "publisher": "harteWired",
   "icon": "media/icon.png",
   "repository": {
     "type": "git",
