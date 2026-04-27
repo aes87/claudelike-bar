@@ -32,10 +32,8 @@ A VS Code sidebar that shows you — at a glance — what every Claude Code term
 
 ## Install
 
-- **[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=harteWired.claudelikebar)** — vanilla VS Code. Search "Claudelike-Bar" in the Extensions panel, or run `code --install-extension harteWired.claudelikebar`.
+- **[VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=harteWired.claudelikebar)** — vanilla VS Code. Search "Claudelike Bar" in the Extensions panel.
 - **[Open VSX](https://open-vsx.org/extension/harteWired/claudelike-bar)** — VSCodium, Cursor, most Dev Containers / Codespaces.
-
-> **Heads up — slug split.** Marketplace ID is `harteWired.claudelikebar` (no hyphen); Open VSX ID is `harteWired.claudelike-bar` (with hyphen). Microsoft permanently reserved the original hyphenated name after a rebrand fumble. The two listings are the same extension.
 
 After install:
 

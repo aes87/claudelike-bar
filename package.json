@@ -1,6 +1,6 @@
 {
-  "name": "claudelikebar",
-  "displayName": "Claudelike-Bar",
+  "name": "claudelike-bar",
+  "displayName": "Claudelike Bar",
   "description": "Live sidebar for Claude Code terminals — see what every session is doing at a glance without tab-switching.",
   "version": "0.17.0",
   "publisher": "harteWired",
@@ -9,7 +9,7 @@
     "type": "git",
     "url": "https://github.com/aes87/claudelike-bar"
   },
-  "homepage": "https://aes87.github.io/claudelike-bar/",
+  "homepage": "https://lab.mattharte.com/claudelike-bar/",
   "bugs": {
     "url": "https://github.com/aes87/claudelike-bar/issues"
   },

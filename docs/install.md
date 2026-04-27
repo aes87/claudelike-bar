@@ -2,8 +2,6 @@
 
 Three install paths. Pick one.
 
-> **Slug split between registries.** Marketplace ID is `harteWired.claudelikebar` (no hyphen); Open VSX ID is `harteWired.claudelike-bar` (with hyphen). Microsoft permanently reserved the hyphenated name after a rebrand fumble — same extension, two slugs. Use the one that matches whichever registry you install from.
-
 ## Prerequisites
 
 - **VS Code** >= 1.93
@@ -33,7 +31,7 @@ Pick the right extension ID for your editor's gallery:
 
 Drop the matching ID into `customizations.vscode.extensions` in `devcontainer.json` and the gallery handles install on attach.
 
-If you want belt-and-suspenders self-heal — for example, environments where the gallery install silently fails — add this to your container's `postAttachCommand`. Idempotent across rebuilds; matches either slug:
+If you want belt-and-suspenders self-heal — for example, environments where the gallery install silently fails — add this to your container's `postAttachCommand`. Idempotent across rebuilds:
 
 ```bash
 if ! code --list-extensions 2>/dev/null | grep -qE 'harteWired\.claudelike-?bar'; then
