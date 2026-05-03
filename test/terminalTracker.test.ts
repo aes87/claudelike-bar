@@ -367,6 +367,75 @@ describe('TerminalTracker v0.9 — multi-agent state', () => {
     expect(getTile()?.pendingSubagents).toBe(0);
   });
 
+  it('subagent counter watchdog clears in-turn drift after inactivity (#30)', () => {
+    // #30: same root cause as #16 (lossy SubagentStop), but the v0.14.1
+    // Stop-reset doesn't fire within a single turn that runs multi-agent
+    // rounds back-to-back without yielding. Simulate 4 rounds of fan-out
+    // (10 starts + 7 stops each — 3 stops dropped per round to debounce
+    // coalescing) inside one turn. Counter accumulates to +12. With no
+    // start/stop activity for 60s the watchdog zeroes the counter.
+    vi.useFakeTimers();
+    try {
+      tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+      for (let round = 0; round < 4; round++) {
+        for (let i = 0; i < 10; i++) {
+          tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+        }
+        for (let i = 0; i < 7; i++) {
+          tracker.updateStatus('my-project', 'subagent_stop', 'SubagentStop');
+        }
+      }
+      expect(getTile()?.pendingSubagents).toBe(12); // 4 rounds × 3 lost stops
+      // Watchdog fires 60s after the last subagent event.
+      vi.advanceTimersByTime(60_001);
+      expect(getTile()?.pendingSubagents).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('subagent watchdog resets on each new event (#30)', () => {
+    // The watchdog should re-arm on every SubagentStart/SubagentStop so a
+    // long-running but still-active fan-out doesn't get its counter wiped
+    // mid-round. Only true inactivity (no events for 60s) should trigger it.
+    vi.useFakeTimers();
+    try {
+      tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+      tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+      tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+      tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+      // 30s in, another start — should re-arm the watchdog.
+      vi.advanceTimersByTime(30_000);
+      tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+      // 30s after that (60s since first start, but only 30s since latest).
+      vi.advanceTimersByTime(30_000);
+      expect(getTile()?.pendingSubagents).toBe(4);
+      // Now go quiet for 61s — watchdog fires.
+      vi.advanceTimersByTime(61_000);
+      expect(getTile()?.pendingSubagents).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('subagent watchdog does not fire when counter naturally drains to 0 (#30)', () => {
+    // Once pendingSubagents reaches 0 organically (matched start/stop), the
+    // watchdog should no longer be armed. A subsequent fresh start/stop pair
+    // that completes shouldn't have a stale wipe pending behind it.
+    vi.useFakeTimers();
+    try {
+      tracker.updateStatus('my-project', 'working', 'UserPromptSubmit');
+      tracker.updateStatus('my-project', 'subagent_start', 'SubagentStart');
+      tracker.updateStatus('my-project', 'subagent_stop', 'SubagentStop');
+      expect(getTile()?.pendingSubagents).toBe(0);
+      // Advance well past the watchdog window — nothing to clear, no drift.
+      vi.advanceTimersByTime(120_000);
+      expect(getTile()?.pendingSubagents).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('getTiles() promotes working+subagentPermissionPending to ready (#23)', () => {
     // Subagent is asking for user permission mid-job — the underlying state
     // is `working` but the user functionally needs to act on it. getTiles()

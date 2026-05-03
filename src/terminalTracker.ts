@@ -13,6 +13,12 @@ import { getStatusDir } from './statusDir';
 // stale from a crashed session.
 const STATUS_FRESH_MS = 60_000;
 
+// v0.17.1 (#30) — inactivity window for the subagent-counter watchdog.
+// 60s mirrors STATUS_FRESH_MS / the ready→waiting timer: long enough that
+// a slow subagent group still re-arms before firing, short enough that a
+// genuinely-stale counter clears within the next attention window.
+const SUBAGENT_WATCHDOG_MS = 60_000;
+
 // Status values that mean "Claude is not actively running" — suppression of
 // the registered tile doesn't apply to these. `idle` is included because a
 // fresh idle file just means the hook fired on session start/end; the slug
@@ -49,6 +55,13 @@ export class TerminalTracker implements vscode.Disposable {
 
   // State machine timers: ready → waiting after 60s
   private readyTimers = new Map<number, NodeJS.Timeout>();
+
+  // v0.17.1 (#30) — per-tile inactivity watchdog for the subagent counter.
+  // Re-armed on every SubagentStart/SubagentStop; if no further start/stop
+  // arrives for SUBAGENT_WATCHDOG_MS, drift is by definition stale and we
+  // zero the counter. Catches the in-turn fan-out case the v0.14.1 Stop-
+  // reset doesn't cover (long agentic turns that never yield a parent Stop).
+  private subagentWatchdogTimers = new Map<number, NodeJS.Timeout>();
 
   // Focus tracking: which tile was focused while in "waiting" state
   private focusedWaitingTile: number | null = null;
@@ -145,6 +158,7 @@ export class TerminalTracker implements vscode.Disposable {
       this.terminals.delete(id);
       this.terminalRefs.delete(id);
       this.clearReadyTimer(id);
+      this.clearSubagentWatchdog(id);
       if (this.focusedWaitingTile === id) {
         this.focusedWaitingTile = null;
       }
@@ -186,6 +200,7 @@ export class TerminalTracker implements vscode.Disposable {
         tile.compacting = false;
         tile.subagentPermissionPending = false;
         this.clearReadyTimer(tile.id);
+        this.clearSubagentWatchdog(tile.id);
       }
       this.focusedWaitingTile = null;
     }
@@ -307,6 +322,7 @@ export class TerminalTracker implements vscode.Disposable {
         tile.subagentPermissionPending = false;
         tile.ignoredText = undefined;
         this.clearReadyTimer(tile.id);
+        this.clearSubagentWatchdog(tile.id);
       } else if (!isShell && wasShell) {
         tile.status = 'idle';
       }
@@ -495,6 +511,7 @@ export class TerminalTracker implements vscode.Disposable {
         tile.ignoredText = undefined;
         tile.statusLabel = this.workingLabel(tile);
         this.clearReadyTimer(tile.id);
+        this.clearSubagentWatchdog(tile.id);
         if (this.focusedWaitingTile === tile.id) {
           this.focusedWaitingTile = null;
         }
@@ -502,6 +519,9 @@ export class TerminalTracker implements vscode.Disposable {
       } else if (status === 'subagent_start') {
         // v0.9 — Task-tool subagent spawned. Increment counter, stay working.
         tile.pendingSubagents = (tile.pendingSubagents ?? 0) + 1;
+        // v0.17.1 (#30) — re-arm the inactivity watchdog on every event so
+        // a long fan-out keeps deferring the wipe; only true silence trips it.
+        this.startSubagentWatchdog(tile.id);
         if (tile.status !== 'done' && tile.status !== 'offline') {
           tile.status = 'working';
           tile.errorType = undefined; // real activity — clear any prior error
@@ -514,6 +534,14 @@ export class TerminalTracker implements vscode.Disposable {
       } else if (status === 'subagent_stop') {
         // v0.9 — subagent finished. Decrement counter (floor 0).
         tile.pendingSubagents = Math.max(0, (tile.pendingSubagents ?? 0) - 1);
+        // v0.17.1 (#30) — counter still non-zero ⇒ keep watchdog armed;
+        // counter just drained to 0 ⇒ disarm so a quiet tile doesn't sit
+        // with a pending wipe queued behind it.
+        if (tile.pendingSubagents > 0) {
+          this.startSubagentWatchdog(tile.id);
+        } else {
+          this.clearSubagentWatchdog(tile.id);
+        }
         // v0.9.3 — when all subagents finish, any pending subagent-permission
         // indicator is stale by definition. We don't track per-subagent
         // permissions, so clearing on count=0 is the conservative rule:
@@ -608,6 +636,7 @@ export class TerminalTracker implements vscode.Disposable {
         if (event === 'Stop') {
           tile.pendingSubagents = 0;
           tile.subagentPermissionPending = false;
+          this.clearSubagentWatchdog(tile.id);
         }
         const hasActiveWork = (tile.pendingSubagents ?? 0) > 0 || tile.teammateIdle;
         if (hasActiveWork) {
@@ -725,6 +754,7 @@ export class TerminalTracker implements vscode.Disposable {
           tile.compacting = false;
           tile.subagentPermissionPending = false;
           this.clearReadyTimer(tile.id);
+          this.clearSubagentWatchdog(tile.id);
           changed = true;
         }
       } else if (status === 'session_end') {
@@ -747,6 +777,7 @@ export class TerminalTracker implements vscode.Disposable {
           tile.compacting = false;
           tile.subagentPermissionPending = false;
           this.clearReadyTimer(tile.id);
+          this.clearSubagentWatchdog(tile.id);
           changed = true;
         }
       } else if (status === 'tool_failure') {
@@ -897,6 +928,39 @@ export class TerminalTracker implements vscode.Disposable {
   }
 
   /**
+   * v0.17.1 (#30) — arm (or re-arm) the inactivity watchdog for a tile's
+   * subagent counter. Called after every SubagentStart/SubagentStop while
+   * `pendingSubagents > 0`. When the timer fires without further activity,
+   * the counter is by definition drift (the parent's Task tool is
+   * synchronous — silence means the round drained), so we zero it and
+   * re-fire onChange so the label updates.
+   */
+  private startSubagentWatchdog(id: number): void {
+    this.clearSubagentWatchdog(id);
+    const timer = setTimeout(() => {
+      this.subagentWatchdogTimers.delete(id);
+      const tile = this.terminals.get(id);
+      if (!tile || (tile.pendingSubagents ?? 0) === 0) return;
+      this.log(() => `subagent watchdog fired for ${tile.name}: zeroing pendingSubagents=${tile.pendingSubagents} (no SubagentStart/Stop in ${SUBAGENT_WATCHDOG_MS}ms)`);
+      tile.pendingSubagents = 0;
+      tile.subagentPermissionPending = false;
+      if (tile.status === 'working') {
+        tile.statusLabel = this.workingLabel(tile);
+      }
+      this.onChangeEmitter.fire();
+    }, SUBAGENT_WATCHDOG_MS);
+    this.subagentWatchdogTimers.set(id, timer);
+  }
+
+  private clearSubagentWatchdog(id: number): void {
+    const existing = this.subagentWatchdogTimers.get(id);
+    if (existing) {
+      clearTimeout(existing);
+      this.subagentWatchdogTimers.delete(id);
+    }
+  }
+
+  /**
    * Manually mark a tile as "done" — silences passive-aggressive judgement
    * when the user knows they're not actively using it. A subsequent
    * UserPromptSubmit will reset it back to "working".
@@ -919,6 +983,7 @@ export class TerminalTracker implements vscode.Disposable {
     tile.subagentPermissionPending = false;
     tile.lastActivity = Date.now();
     this.clearReadyTimer(id);
+    this.clearSubagentWatchdog(id);
     if (this.focusedWaitingTile === id) {
       this.focusedWaitingTile = null;
     }
@@ -1176,6 +1241,10 @@ export class TerminalTracker implements vscode.Disposable {
       clearTimeout(timer);
     }
     this.readyTimers.clear();
+    for (const timer of this.subagentWatchdogTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.subagentWatchdogTimers.clear();
     for (const d of this.disposables) d.dispose();
     this.terminals.clear();
     this.terminalRefs.clear();
